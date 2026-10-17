@@ -53,12 +53,12 @@ set -euo pipefail
     # ============================================================
     # Build helper
     # ============================================================
-
     build_target() {
         local name="$1"
         local output_dir="$2"
         local compiler="$3"
         local target="${4:-}"
+        local arch="${5:-}"
         local output="$output_dir/logamuffin"
 
         if [[ "$output_dir" == windows-* ]]; then
@@ -76,8 +76,6 @@ set -euo pipefail
         mkdir -p -- "$output_dir"
 
         if [[ -n "$target" ]]; then
-            # Zig cross-compilation
-            # compiler is intentionally invoked through the shell below
             zig c++ \
                 -target "$target" \
                 "-std=$CXX_STANDARD" \
@@ -85,8 +83,13 @@ set -euo pipefail
                 logamuffin.cpp \
                 -o "$output"
         else
-            # Native compilation
+            local -a arch_flags=()
+            if [[ -n "$arch" ]]; then
+                arch_flags=(-arch "$arch")
+            fi
+
             "$compiler" \
+                "${arch_flags[@]}" \
                 "-std=$CXX_STANDARD" \
                 "${BUILD_FLAGS[@]}" \
                 logamuffin.cpp \
@@ -100,12 +103,17 @@ set -euo pipefail
     # ============================================================
     # Targets
     # ============================================================
+    build_target "macOS Intel x86-64" \
+        "macos-x86_64" "$NATIVE_CXX" "" "x86_64"
 
-    build_target "macOS x86-64" \
-        "macos-x86_64" "$NATIVE_CXX"
+    build_target "macOS Apple Silicon ARM64" \
+        "macos-arm64" "$NATIVE_CXX" "" "arm64"
 
     build_target "Windows x86-64 (GNU)" \
         "windows-x86_64" "" "x86_64-windows-gnu"
+
+    build_target "Windows ARM64 (GNU)" \
+        "windows-arm64" "" "aarch64-windows-gnu"
 
     build_target "Linux x86-64 (musl)" \
         "linux-x86_64" "" "x86_64-linux-musl"
@@ -122,7 +130,8 @@ set -euo pipefail
     echo "============================================================"
     echo "Mode: $BUILD_MODE"
     echo
-    find macos-x86_64 windows-x86_64 linux-x86_64 linux-arm64 \
+    find macos-x86_64 macos-arm64 windows-x86_64 linux-x86_64 linux-arm64 \
         -maxdepth 1 -type f -name 'logamuffin*' -print
     echo
+
 )

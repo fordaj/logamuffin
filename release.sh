@@ -115,8 +115,10 @@ set -euo pipefail
 
     # Each entry: archive name | binary path | archive format
     TARGETS=(
+        "macos-arm64|macos-arm64/logamuffin|tar.gz"
         "macos-x86_64|macos-x86_64/logamuffin|tar.gz"
         "windows-x86_64|windows-x86_64/logamuffin.exe|zip"
+        "windows-aarch64|windows-arm64/logamuffin.exe|zip"
         "linux-x86_64-musl|linux-x86_64/logamuffin|tar.gz"
         "linux-aarch64-musl|linux-arm64/logamuffin|tar.gz"
     )
