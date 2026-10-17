@@ -401,7 +401,7 @@ if (width >= 180) {
 
 // Level is always included, regardless of terminal width.
 if (color) {
-    prefix += ANSI_RESET; // bold gray would be better
+    prefix += ANSI_HI_BLACK;
     prefix += '[';
     prefix += li.name;
     prefix += ']';
