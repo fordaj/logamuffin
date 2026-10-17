@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-LOG_BIN="${LOG_BIN:-$SCRIPT_DIR/macos-x86_64/logger}"
+LOG_BIN="${LOG_BIN:-$SCRIPT_DIR/macos-x86_64/logamuffin}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -37,7 +37,7 @@ not_contains() {
     ! grep -Fq -- "$text" "$file"
 }
 
-run_logger() {
+run_logamuffin() {
     "$LOG_BIN" "$@" >"$TMP_DIR/stdout" 2>"$TMP_DIR/stderr"
 }
 
@@ -46,7 +46,7 @@ run_logger() {
 # ------------------------------------------------------------
 
 check "Version command"
-run_logger --version
+run_logamuffin --version
 
 check "Missing arguments return usage error"
 bash -c '"$1" >/dev/null 2>&1; [[ $? -eq 2 ]]' _ "$LOG_BIN"
@@ -62,9 +62,9 @@ bash -c '"$1" INVALID message >/dev/null 2>&1; [[ $? -eq 2 ]]' _ "$LOG_BIN"
 
 for level in ALWAYS TRACE DEBUG INFO WARN WARNING ERROR CRITICAL FATAL; do
     if [[ "$level" == ALWAYS ]]; then
-        LOG_LEVEL=ERROR run_logger "$level" "TEST_$level"
+        LOG_LEVEL=ERROR run_logamuffin "$level" "TEST_$level"
     else
-        LOG_LEVEL=TRACE run_logger "$level" "TEST_$level"
+        LOG_LEVEL=TRACE run_logamuffin "$level" "TEST_$level"
     fi
 
     check "$level appears in file" \
@@ -77,19 +77,19 @@ done
 
 : >"$LOG_FILE"
 
-LOG_LEVEL=INFO run_logger TRACE FILTER_TRACE
+LOG_LEVEL=INFO run_logamuffin TRACE FILTER_TRACE
 check "TRACE filtered at INFO threshold"
 not_contains FILTER_TRACE "$LOG_FILE"
 
-LOG_LEVEL=INFO run_logger DEBUG FILTER_DEBUG
+LOG_LEVEL=INFO run_logamuffin DEBUG FILTER_DEBUG
 check "DEBUG filtered at INFO threshold"
 not_contains FILTER_DEBUG "$LOG_FILE"
 
-LOG_LEVEL=INFO run_logger INFO FILTER_INFO
+LOG_LEVEL=INFO run_logamuffin INFO FILTER_INFO
 check "INFO included at INFO threshold"
 contains FILTER_INFO "$LOG_FILE"
 
-LOG_LEVEL=INFO run_logger ALWAYS FILTER_ALWAYS
+LOG_LEVEL=INFO run_logamuffin ALWAYS FILTER_ALWAYS
 check "ALWAYS bypasses threshold"
 contains FILTER_ALWAYS "$LOG_FILE"
 
@@ -104,11 +104,11 @@ bash -c 'LOG_LEVEL=BOGUS "$1" INFO test >/dev/null 2>&1; [[ $? -eq 2 ]]' _ "$LOG
 # Output streams
 # ------------------------------------------------------------
 
-LOG_LEVEL=TRACE run_logger INFO STREAM_INFO
+LOG_LEVEL=TRACE run_logamuffin INFO STREAM_INFO
 check "INFO goes to stdout"
 contains STREAM_INFO "$TMP_DIR/stdout"
 
-LOG_LEVEL=TRACE run_logger ERROR STREAM_ERROR
+LOG_LEVEL=TRACE run_logamuffin ERROR STREAM_ERROR
 check "ERROR goes to stderr"
 contains STREAM_ERROR "$TMP_DIR/stderr"
 
@@ -117,7 +117,7 @@ contains STREAM_ERROR "$TMP_DIR/stderr"
 # ------------------------------------------------------------
 
 : >"$LOG_FILE"
-LOG_LEVEL=TRACE run_logger INFO $'MULTI_FIRST\nMULTI_SECOND\nMULTI_THIRD'
+LOG_LEVEL=TRACE run_logamuffin INFO $'MULTI_FIRST\nMULTI_SECOND\nMULTI_THIRD'
 
 check "First multiline segment is written"
 contains MULTI_FIRST "$LOG_FILE"

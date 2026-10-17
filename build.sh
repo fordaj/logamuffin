@@ -41,7 +41,7 @@ set -euo pipefail
     cd "$SCRIPT_DIR"
 
     echo "============================================================"
-    echo " Logger Build"
+    echo " Logamuffin Build"
     echo "============================================================"
     echo "Mode:       $BUILD_MODE"
     echo "C++:        $CXX_STANDARD"
@@ -59,7 +59,7 @@ set -euo pipefail
         local output_dir="$2"
         local compiler="$3"
         local target="${4:-}"
-        local output="$output_dir/logger"
+        local output="$output_dir/logamuffin"
 
         if [[ "$output_dir" == windows-* ]]; then
             output="${output}.exe"
@@ -82,14 +82,14 @@ set -euo pipefail
                 -target "$target" \
                 "-std=$CXX_STANDARD" \
                 "${BUILD_FLAGS[@]}" \
-                logger.cpp \
+                logamuffin.cpp \
                 -o "$output"
         else
             # Native compilation
             "$compiler" \
                 "-std=$CXX_STANDARD" \
                 "${BUILD_FLAGS[@]}" \
-                logger.cpp \
+                logamuffin.cpp \
                 -o "$output"
         fi
 
@@ -123,6 +123,6 @@ set -euo pipefail
     echo "Mode: $BUILD_MODE"
     echo
     find macos-x86_64 windows-x86_64 linux-x86_64 linux-arm64 \
-        -maxdepth 1 -type f -name 'logger*' -print
+        -maxdepth 1 -type f -name 'logamuffin*' -print
     echo
 )

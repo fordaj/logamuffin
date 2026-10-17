@@ -302,17 +302,17 @@ std::string get_source(const char* argv0) {
     if (source && *source)
         return basename(source);
 
-    return basename(argv0 ? argv0 : "logger");
+    return basename(argv0 ? argv0 : "logamuffin");
 }
 
 int run(int argc, char* argv[]) {
     if (argc == 2 && std::string_view(argv[1]) == "--version") {
-        std::cout << "logger " << LOGGER_VERSION << '\n';
+        std::cout << "logamuffin " << LOGAMUFFIN_VERSION << '\n';
         return 0;
     }
     if (argc < 3) {
         std::cerr
-            << "Usage: logger LEVEL MESSAGE [MESSAGE ...]\n"
+            << "Usage: logamuffin LEVEL MESSAGE [MESSAGE ...]\n"
             << "Levels: TRACE DEBUG INFO WARN WARNING ERROR "
                "CRITICAL FATAL ALWAYS\n";
         return 2;
@@ -440,7 +440,7 @@ output += message;
             file.parent_path(), ec);
 
         if (ec) {
-            std::cerr << "logger: failed to create log directory: "
+            std::cerr << "logamuffin: failed to create log directory: "
                       << ec.message() << '\n';
             return 1;
         }
@@ -464,7 +464,7 @@ output += message;
     entry += '\n';
 
     if (!append_locked(file, entry)) {
-        std::cerr << "logger: failed to append log file\n";
+        std::cerr << "logamuffin: failed to append log file\n";
     }
 
 
@@ -477,7 +477,7 @@ int main(int argc, char* argv[]) {
     try {
         return run(argc, argv);
     } catch (const std::exception& e) {
-        std::cerr << "logger: " << e.what() << '\n';
+        std::cerr << "logamuffin: " << e.what() << '\n';
         return 1;
     }
 }
