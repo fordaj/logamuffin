@@ -24,14 +24,16 @@ set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 resolve_logger() {
-    if command -v logamuffin >/dev/null 2>&1; then
-        command -v logamuffin
+    # Fresh native build first so the showcase always exercises the current
+    # checkout (an installed `logamuffin` on PATH may be an older release whose
+    # BOGUS/--config handling and valid-levels output differ — see issue #12).
+    if [[ -x "$SCRIPT_DIR/build/logamuffin" ]]; then
+        printf '%s\n' "$SCRIPT_DIR/build/logamuffin"
         return 0
     fi
 
-    # Fresh native build from ./run_tests.sh (single-command path).
-    if [[ -x "$SCRIPT_DIR/build/logamuffin" ]]; then
-        printf '%s\n' "$SCRIPT_DIR/build/logamuffin"
+    if command -v logamuffin >/dev/null 2>&1; then
+        command -v logamuffin
         return 0
     fi
 
@@ -405,10 +407,11 @@ LOG_LEVELS='NOTICE=5:blue' LOG_LEVEL=NOTICE "$LOGGER" INFO "INFO passes: redefin
 cmd "LOG_LEVELS='ERROR=10:red' ERROR \"ERROR forced low still goes to stderr (name wins)\""
 LOG_LEVELS='ERROR=10:red' LOG_LEVEL=TRACE "$LOGGER" ERROR "ERROR forced low still goes to stderr (name wins)"
 
-note '--- unknown color is rejected (exit 2, no output above) ---'
+note '--- unknown color is rejected (exit 2, error message below, no log line) ---'
 cmd "LOG_LEVELS='BOGUS=20:notacolor' INFO \"should fail with exit 2\""
 LOG_LEVELS='BOGUS=20:notacolor' LOG_LEVEL=TRACE "$LOGGER" INFO "should fail with exit 2" 2>&1
-printf '  (exit %s)\n' "$?"
+bogus_color_exit=$?
+printf '  (exit %s)\n' "$bogus_color_exit"
 
 # ============================================================
 # 8. JSON config file
@@ -634,18 +637,24 @@ cmd "INFO \"piped message\" | tr 'a-z' 'A-Z' (pipeline)"
 LOG_COLOR=0 "$LOGGER" INFO "piped message" | tr 'a-z' 'A-Z'
 
 note '--- exit codes ---'
+cmd "INFO \"success exits 0\""
 "$LOGGER" INFO "success exits 0"
 printf '  (exit %s)\n' "$?"
 
+cmd "LOG_LEVEL=WARNING INFO \"filtered exits 0\""
 LOG_LEVEL=WARNING "$LOGGER" INFO "filtered exits 0"
 printf '  (exit %s)\n' "$?"
 
-"$LOGGER" BOGUS "unknown level" 2>"$DEMO_TMP/err"
-printf '  unknown level exit %s (expected 2)\n' "$?"
+cmd "BOGUS \"unknown level\" 2> err (expected exit 2)"
+( cd "$DEMO_TMP/empty" && "$LOGGER" BOGUS "unknown level" 2>"$DEMO_TMP/err" )
+bogus_exit=$?
+printf '  unknown level exit %s (expected 2)\n' "$bogus_exit"
 cat "$DEMO_TMP/err"
 
-"$LOGGER" 2>"$DEMO_TMP/err"
-printf '  missing arguments exit %s (expected 2)\n' "$?"
+cmd "logamuffin (no arguments) 2> err (expected exit 2)"
+( cd "$DEMO_TMP/empty" && "$LOGGER" 2>"$DEMO_TMP/err" )
+missing_exit=$?
+printf '  missing arguments exit %s (expected 2)\n' "$missing_exit"
 cat "$DEMO_TMP/err"
 
 # ============================================================
