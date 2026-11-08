@@ -76,3 +76,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Python (integration tests)
+__pycache__/
+*.py[cod]

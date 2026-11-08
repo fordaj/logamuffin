@@ -268,6 +268,38 @@ VERSION=0.1.1 ./release.sh
 
 Otherwise, the release version is derived from `version.hpp`.
 
+## Testing
+
+Logamuffin is covered by C++ unit tests and cross-platform CLI
+integration tests. Run the complete suite with:
+
+```bash
+./run_tests.sh
+```
+
+This builds the unit tests and a native development binary, then
+runs both suites. Requirements are a C++ compiler with C++20
+support and Python 3 (standard library only). The doctest header is
+vendored, so no package installation is needed.
+
+Useful variants:
+
+```bash
+./run_tests.sh --skip-unit          # integration only
+./run_tests.sh --skip-integration   # unit only
+./run_tests.sh --executable ./macos-arm64/logamuffin  # test a release binary
+```
+
+The CLI integration suite can also target any binary directly:
+
+```bash
+python3 tests/integration/test_cli.py --executable build/logamuffin
+LOG_BIN=/path/to/logamuffin python3 tests/integration/test_cli.py
+```
+
+See [docs/TESTING.md](docs/TESTING.md) for the testing architecture,
+what each suite covers, and how to add tests.
+
 ## Design philosophy
 
 Logamuffin aims to be a small, dependable utility that does one thing well.
