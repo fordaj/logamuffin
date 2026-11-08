@@ -1,0 +1,221 @@
+# Testing Logamuffin
+
+Logamuffin has two test suites that together cover correctness, CLI
+behavior, and cross-platform compatibility — without adding any runtime
+dependency for Logamuffin users.
+
+| Suite | Location | Framework | What it tests |
+| ----- | -------- | --------- | ------------- |
+| **C++ unit tests** | `tests/unit/test_logamuffin.cpp` | [doctest](https://github.com/doctest/doctest) 2.5.3 (vendored) | Severity parsing, filtering, configuration, message formatting, output formatting |
+| **CLI integration tests** | `tests/integration/test_cli.py` | Python standard library (`unittest`) | Arguments, aliases, env vars, stdout/stderr, files, colors, messages, concurrency, exit codes |
+
+There is **one command** to run everything:
+
+```bash
+./run_tests.sh
+```
+
+## Quick start
+
+### Prerequisites
+
+- A C++ compiler with C++20 support (defaults to `clang++`, falls back to `c++`).
+- Python 3 (standard library only — no `pip install` needed).
+- Bash (the `run_tests.sh` entry point is POSIX; the integration suite itself is cross-platform).
+
+No other dependencies. The doctest header is already vendored at
+`tools/doctest/v2.5.3/doctest.h`.
+
+### Run everything
+
+```bash
+./run_tests.sh
+```
+
+This builds:
+
+1. The unit-test binary: `build/tests/unit/test_logamuffin`
+2. A fresh native `logamuffin` binary: `build/logamuffin`
+   (compiled directly with the native compiler — not the full
+   six-target `build.sh` cross-compile, which needs Zig).
+
+Then it runs both suites and prints a summary. The exit code is `0`
+only if both suites pass; individual failures are reported without
+stopping the suite.
+
+### Useful variants
+
+```bash
+./run_tests.sh --skip-unit          # integration only
+./run_tests.sh --skip-integration   # unit only
+./run_tests.sh --verbose            # verbose integration output
+./run_tests.sh --clean              # drop previous test build outputs first
+./run_tests.sh --help
+
+# Test a packaged release binary instead of a fresh dev build:
+./run_tests.sh --executable ./macos-arm64/logamuffin
+./run_tests.sh --executable /path/to/logamuffin.exe
+```
+
+The integration suite can also be run directly, on any platform:
+
+```bash
+# Explicit binary (same as --executable):
+python3 tests/integration/test_cli.py --executable build/logamuffin
+
+# Via environment variable (also works with unittest discovery):
+LOG_BIN=/path/to/logamuffin python3 tests/integration/test_cli.py
+LOG_BIN=/path/to/logamuffin python3 -m unittest tests.integration.test_cli -v
+
+# Windows:
+LOG_BIN=logamuffin.exe python tests\integration\test_cli.py
+```
+
+If no binary is specified, the integration suite searches (in order):
+`build/logamuffin`, `build/native/logamuffin`, the `macos-*` /
+`linux-*` / `windows-*` build directories, then `PATH`.
+
+## Architecture
+
+### Testable core: `logamuffin.hpp`
+
+The executable originally kept all logic in an anonymous namespace
+inside `logamuffin.cpp`, which made the pure logic untestable without
+subprocess indirection.
+
+To keep the change minimal, the pure helpers moved to a header-only
+core module, `logamuffin.hpp` (`namespace logamuffin`, all functions
+`inline`):
+
+- `Level`, `LevelInfo`, `levels` and `info()` — severity model.
+- `uppercase()`, `basename()` — string helpers.
+- `parse_level()` — severity names and aliases (`WARN`/`WARNING`,
+  `FATAL`/`CRITICAL`), case-insensitive.
+- `env_enabled()` — `LOG_COLOR` truthiness (`1`/`TRUE`/`YES`/`ON`).
+- `get_source()` — `LOG_SOURCE` override handling.
+- `clean_message()` — strips `\r`, preserves `\n`.
+- `should_emit()` — filtering predicate (`ALWAYS` bypasses).
+- `join_message()` — multi-argument joining.
+- `format_file_entry()` / `format_console_output()` — plain-text file
+  lines and console lines (color + terminal-width branches).
+
+`logamuffin.cpp` now only owns platform/process concerns (`hostname()`,
+TTY detection, terminal width, locked file append, `run()`/`main()`) and
+calls the core for everything testable. There is **no observable
+behavior change**: same messages, exit codes, streams, and file format.
+`build.sh` needed no changes.
+
+The unit tests `#include "logamuffin.hpp"` directly, so they exercise
+the exact code the executable runs.
+
+### Why doctest for unit tests
+
+- Single header, vendored — no Conan/vcpkg/CMake prerequisite for a
+  one-file C++ tool.
+- Lightweight enough to match the project's philosophy; no mocking
+  framework needed for pure helpers.
+- Descriptive `TEST_CASE` / `SUBCASE` names and expression
+  decomposition give useful failure messages for free.
+
+### Why Python stdlib for integration tests
+
+- **Cross-platform execution** with zero runtime/test dependencies
+  for Logamuffin users (test deps stay separate from the shipped
+  binary, which remains a standalone executable).
+- `unittest` reports every failure without aborting the suite, unlike
+  a failing `set -e` Bash chain.
+- Tests target an **explicitly specified executable** and run each
+  case in an **isolated temporary directory** (`tempfile`, cleaned up
+  via `addCleanup`), so they work against both development builds and
+  packaged release binaries and never touch the repo state.
+- List-argument `subprocess` (no shell) so arguments with spaces,
+  newlines, and special characters are passed exactly.
+
+### What is covered where
+
+**Unit tests** (`tests/unit/test_logamuffin.cpp`, 19 cases / 211
+assertions) test *pure helpers*: case conversion, path basenames,
+all level names + aliases + case-insensitivity, invalid-name
+rejection, numeric ordering, display names/colors, labels
+(`WARN`, `CRITICAL`), `\r` cleaning, `LOG_COLOR` truthiness,
+`LOG_SOURCE` fallback, filtering truth table, message joining, file
+and console formatting (including the 120/180 width thresholds and
+ANSI branches), and the `YYYY-MM-DD HH:MM:SS,mmm` timestamp shape.
+
+**Integration tests** (`tests/integration/test_cli.py`, 42 test
+methods, many with `subTest`s) test *observable behavior*:
+
+- Arguments & validation: `--version`, missing/incomplete args,
+  unknown level (lists valid levels), `--version extra`, lowercase
+  levels, empty message.
+- Severity aliases & filtering: every documented level, `WARN` vs
+  `WARNING`, `FATAL` vs `CRITICAL`, default `INFO` threshold,
+  `LOG_LEVEL` overrides, `ALWAYS` bypass, filtered exit `0`.
+- Environment: invalid `LOG_LEVEL`, `LOG_LEVEL=ALWAYS` rejected,
+  case/alias thresholds, default + empty `LOG_FILE` fallback to
+  `.logs/log.log`, `LOG_SOURCE` override vs executable-name default.
+- Streams: `TRACE`..`WARNING` → stdout, `ERROR`/`CRITICAL` → stderr,
+  `ALWAYS` → stdout.
+- Files: creation, append order, parent-directory creation, filtered
+  does-not-create, plain-text file even with `LOG_COLOR=1`,
+  directory-as-`LOG_FILE` warns but console succeeds, `--version`
+  writes nothing, file-line format regex.
+- Colors: `LOG_COLOR=0` plain, `=1` ANSI, all truthy/falsy variants,
+  unset + captured output is plain.
+- Messages: multi-argument single-space join, multiline preserved,
+  `\r` cleaned, special characters preserved verbatim.
+- Concurrency: 10 parallel writers → all 10 lines in the file.
+- Exit codes: `0` success/filtered/version, `2` usage/level/env errors.
+
+The legacy Bash suite `test.sh` is **preserved unchanged** as a quick
+POSIX smoke check. The Python suite supersedes it — it covers
+everything `test.sh` did (version, usage, invalid severity, all
+severities, `INFO` filtering, `ALWAYS`, invalid `LOG_LEVEL`, stream
+routing, multiline) plus the missing cases above. `run_tests.sh`
+uses the Python suite.
+
+## CI
+
+CI (GitHub Actions, multi-OS/arch, sanitizers, debug/release matrix)
+is **intentionally out of scope for this ticket** and will be
+handled as a separate follow-up. Nothing in the test layout blocks
+it: `run_tests.sh` is the single entry point a CI job would call,
+and the integration suite already accepts an explicit binary for
+release verification.
+
+## Adding tests
+
+### Unit tests
+
+Add a `TEST_CASE("descriptive name")` in
+`tests/unit/test_logamuffin.cpp` and assert with `CHECK` /
+`REQUIRE`. Prefer testing observable helper output (parsed level,
+emitted/not-emitted, formatted string) over implementation details.
+If a helper needs environment access, wrap it in the existing
+`EnvGuard` pattern so variables are restored.
+
+### Integration tests
+
+Add a `test_` method to the appropriate class in
+`tests/integration/test_cli.py` (or a new `TestCase` subclass).
+Use `self.run_bin([...], KEY=value)` — it strips host `LOG_*`
+variables, defaults `LOG_COLOR=0` and an isolated `LOG_FILE`, and
+returns `(returncode, stdout, stderr)`. Read the log with
+`self.read_log()`. Use `subTest` for parameterized cases. Keep tests
+deterministic: never depend on hostname, exact timestamps, or terminal
+width; assert with `assertIn` / regex instead.
+
+## Layout
+
+```
+logamuffin.hpp                     testable core (pure helpers)
+logamuffin.cpp                     executable (platform I/O + run/main)
+run_tests.sh                       one-command entry point
+tests/unit/test_logamuffin.cpp     doctest unit tests
+tests/integration/test_cli.py      Python stdlib CLI tests
+tools/doctest/v2.5.3/doctest.h     vendored doctest
+test.sh                            legacy POSIX smoke test (preserved)
+docs/TESTING.md                    this file
+build/                             ignored build outputs
+```
+

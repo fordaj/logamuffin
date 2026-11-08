@@ -1,20 +1,11 @@
 
-#include <array>
-#include <chrono>
-#include <cstdlib>
-#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <string_view>
-#include <algorithm>
-#include <cctype>
-#include <sstream>
-
 #include <cstdio>
 #include <exception>
-#include <utility>
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -29,50 +20,11 @@
 #endif
 
 #include "version.hpp"
-#include "ansi_colors.hpp"
+#include "logamuffin.hpp"
 
 namespace {
 
-enum class Level : int {
-    Always   = -1,
-    Trace    = 5,
-    Debug    = 10,
-    Info     = 20,
-    Warning  = 30,
-    Error    = 40,
-    Critical = 50
-};
-
-struct LevelInfo {
-    std::string_view name;
-    std::string_view color;
-    Level level;
-};
-
-
-constexpr std::array<LevelInfo, 7> levels{{
-    {"ALWAYS",   ANSI_PURPLE, Level::Always},
-    {"TRACE",    ANSI_CYAN,   Level::Trace},
-    {"DEBUG",    ANSI_GREEN,   Level::Debug},
-    {"INFO",     ANSI_RESET,    Level::Info},
-    {"WARN",     ANSI_YELLOW,   Level::Warning},
-    {"ERROR",    ANSI_RED,   Level::Error},
-    {"CRITICAL", ANSI_PURPLE,   Level::Critical}
-}};
-
-
-std::string uppercase(std::string s) {
-    for (char& c : s)
-        c = static_cast<char>(
-            std::toupper(static_cast<unsigned char>(c)));
-    return s;
-}
-
-std::string basename(std::string path) {
-    const auto pos = path.find_last_of("/\\");
-    return pos == std::string::npos
-        ? path : path.substr(pos + 1);
-}
+using namespace logamuffin;
 
 std::string hostname() {
     std::string result;
@@ -135,7 +87,7 @@ bool append_locked(
     const std::filesystem::path& path,
     const std::string& entry)
 {
-    
+
 #ifdef _WIN32
     HANDLE file = CreateFileW(
         path.c_str(),
@@ -229,82 +181,6 @@ bool append_locked(
 }
 
 
-bool env_enabled(const char* name, bool fallback) {
-    const char* value = std::getenv(name);
-    if (!value)
-        return fallback;
-
-    const std::string v = uppercase(value);
-    return v == "1" || v == "TRUE" || v == "YES" || v == "ON";
-}
-
-bool parse_level(std::string value, Level& out) {
-    value = uppercase(std::move(value));
-
-    if (value == "TRACE")    out = Level::Trace;
-    else if (value == "DEBUG") out = Level::Debug;
-    else if (value == "INFO")  out = Level::Info;
-    else if (value == "WARN" || value == "WARNING")
-        out = Level::Warning;
-    else if (value == "ERROR") out = Level::Error;
-    else if (value == "FATAL" || value == "CRITICAL")
-        out = Level::Critical;
-    else if (value == "ALWAYS") out = Level::Always;
-    else return false;
-
-    return true;
-}
-
-const LevelInfo& info(Level level) {
-    for (const auto& entry : levels)
-        if (entry.level == level)
-            return entry;
-
-    return levels[3];
-}
-
-std::string timestamp() {
-    using namespace std::chrono;
-
-    const auto now = system_clock::now();
-    const auto millis = duration_cast<milliseconds>(
-        now.time_since_epoch()).count() % 1000;
-
-    const std::time_t time = system_clock::to_time_t(now);
-    std::tm tm{};
-
-#ifdef _WIN32
-    localtime_s(&tm, &time);
-#else
-    localtime_r(&time, &tm);
-#endif
-
-    char buffer[32]{};
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
-
-    char result[40]{};
-    std::snprintf(result, sizeof(result), "%s,%03lld",
-                  buffer, static_cast<long long>(millis));
-
-    return result;
-}
-
-std::string clean_message(std::string message) {
-    message.erase(
-        std::remove(message.begin(), message.end(), '\r'),
-        message.end());
-    return message;
-}
-
-std::string get_source(const char* argv0) {
-    const char* source = std::getenv("LOG_SOURCE");
-
-    if (source && *source)
-        return basename(source);
-
-    return basename(argv0 ? argv0 : "logamuffin");
-}
-
 int run(int argc, char* argv[]) {
     if (argc == 2 && std::string_view(argv[1]) == "--version") {
         std::cout << "logamuffin " << LOGAMUFFIN_VERSION << '\n';
@@ -340,22 +216,14 @@ int run(int argc, char* argv[]) {
         }
     }
 
-    // Join all message arguments with spaces.
-    std::string message;
-    for (int i = 2; i < argc; ++i) {
-        if (i > 2)
-            message += ' ';
-        message += argv[i];
-    }
-    message = clean_message(std::move(message));
+    // Join all message arguments with spaces and strip carriage returns.
+    const std::string message = join_message(argc, argv, 2);
 
     // Filter before doing timestamp, formatting, and file I/O.
-    if (level != Level::Always &&
-        static_cast<int>(level) < static_cast<int>(threshold)) {
+    if (!should_emit(level, threshold)) {
         return 0;
     }
 
-    const auto& li = info(level);
     const std::string time = timestamp();
     const std::string pc = hostname();
     const std::string source = get_source(argv[0]);
@@ -363,72 +231,15 @@ int run(int argc, char* argv[]) {
     FILE* stream = level >= Level::Error ? stderr : stdout;
     const bool color = env_enabled("LOG_COLOR", terminal(stream));
 
-const int width = terminal(stream) ? terminal_width() : 180;
+    const int width = terminal(stream) ? terminal_width() : 180;
 
-std::string prefix;
-
-// Timestamp and hostname at >= 180 columns;
-// source filename at >= 120 columns.
-if (width >= 180) {
-    if (color) {
-        prefix += ANSI_GREEN;
-        prefix += time;
-        prefix += ANSI_RESET;
-        prefix += ' ';
-        prefix += ANSI_PURPLE;
-        prefix += pc;
-        prefix += ANSI_RESET;
-        prefix += ' ';
-        prefix += ANSI_BLUE;
-        prefix += source;
-        prefix += ':';
-        prefix += ANSI_RESET;
-        prefix += ' ';
-    } else {
-        prefix += time + " " + pc + " " + source + ": ";
-    }
-} else if (width >= 120) {
-    if (color) {
-        prefix += ANSI_BLUE;
-        prefix += source;
-        prefix += ':';
-        prefix += ANSI_RESET;
-        prefix += ' ';
-    } else {
-        prefix += source + ": ";
-    }
-}
-
-// Level is always included, regardless of terminal width.
-if (color) {
-    prefix += ANSI_HI_BLACK;
-    prefix += '[';
-    prefix += li.name;
-    prefix += ']';
-    prefix += ANSI_RESET;
-    prefix += ' ';
-    prefix += li.color;
-} else {
-    prefix += '[';
-    prefix += li.name;
-    prefix += "] ";
-}
-
-
-    std::string output;
-output.reserve(prefix.size() + message.size() + 16);
-output += prefix;
-output += message;
-
-    if (color)
-        output += ANSI_RESET;
-
-    output += '\n';
+    const std::string output =
+        format_console_output(time, pc, level, source, message, color, width);
 
     std::fwrite(output.data(), 1, output.size(), stream);
     std::fflush(stream);
 
-    
+
     // Plain-text file logging, independent of console colors.
     const char* file_env = std::getenv("LOG_FILE");
     const std::filesystem::path file =
@@ -447,21 +258,8 @@ output += message;
     }
 
     // Construct the complete entry before acquiring the lock.
-    std::string entry;
-    entry.reserve(
-        time.size() + pc.size() + source.size() +
-        message.size() + li.name.size() + 8);
-
-    entry += time;
-    entry += ' ';
-    entry += pc;
-    entry += " [";
-    entry += li.name;
-    entry += "] ";
-    entry += source;
-    entry += ": ";
-    entry += message;
-    entry += '\n';
+    const std::string entry =
+        format_file_entry(time, pc, level, source, message);
 
     if (!append_locked(file, entry)) {
         std::cerr << "logamuffin: failed to append log file\n";
