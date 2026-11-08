@@ -141,6 +141,12 @@ logamuffin INFO "Build completed successfully"
 
 ![Demo](image.png)
 
+Run `./demo.sh` to see every capability above in action in one
+visual pass (version/help, levels and colors, filtering, streams, env
+and JSON configuration and precedence, file logging, concurrent
+writes, and shell patterns). Re-run it after any change to compare
+outputs for regressions; recapture `image.png` from the new run.
+
 ## Configuration
 
 Logamuffin uses environment variables, an optional JSON config file, and a `--config` option so you can customize its behavior without recompiling the executable.
