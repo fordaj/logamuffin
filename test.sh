@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Legacy Bash CLI integration tests.
+# Preserved for backward compatibility; the primary suite is now
+# tests/integration/test_cli.py (Python stdlib, cross-platform) run
+# via ./run_tests.sh. This file's checks are reproduced there.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

@@ -305,7 +305,7 @@ std::string get_source(const char* argv0) {
     return basename(argv0 ? argv0 : "logamuffin");
 }
 
-int run(int argc, char* argv[]) {
+[[maybe_unused]] int run(int argc, char* argv[]) {
     if (argc == 2 && std::string_view(argv[1]) == "--version") {
         std::cout << "logamuffin " << LOGAMUFFIN_VERSION << '\n';
         return 0;
@@ -473,6 +473,7 @@ output += message;
 
 } // namespace
 
+#ifndef LOGAMUFFIN_NO_MAIN
 int main(int argc, char* argv[]) {
     try {
         return run(argc, argv);
@@ -481,3 +482,4 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 }
+#endif

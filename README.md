@@ -268,6 +268,58 @@ VERSION=0.1.1 ./release.sh
 
 Otherwise, the release version is derived from `version.hpp`.
 
+## Testing
+
+Run the complete test suite with a single command:
+
+```bash
+./run_tests.sh
+```
+
+This builds the executable and the C++ unit tests, then runs both suites:
+
+| Suite | Location | Framework | Coverage |
+| ----- | -------- | --------- | -------- |
+| Unit tests | `tests/unit/test_logamuffin.cpp` | [doctest v2.5.3](https://github.com/doctest/doctest) (vendored single header) | Severity parsing, filtering, configuration, message formatting, and file appending |
+| CLI integration tests | `tests/integration/test_cli.py` | Python standard library `unittest` only | Argument parsing/exit codes, severity aliases/filtering, environment defaults/overrides, stdout/stderr routing, file creation/appending/errors, ANSI colors, multiline and multi-argument messages, concurrent writes |
+
+Run a single layer or a single case:
+
+```bash
+./run_tests.sh --only-unit
+./run_tests.sh --only-integration
+./run_tests.sh --skip-unit        # integration only
+BUILD_MODE=debug ./run_tests.sh   # debug (-O0 -g3 -DDEBUG)
+SANITIZE=1 ./run_tests.sh         # AddressSanitizer + UBSan
+python3 tests/integration/test_cli.py --executable ./build/logamuffin -v
+```
+
+The integration tests target an explicitly specified executable, so they
+run against both development builds and packaged release binaries:
+
+```bash
+LOG_BIN=./build/logamuffin python3 tests/integration/test_cli.py
+LOG_BIN=/path/to/packaged/logamuffin python3 tests/integration/test_cli.py
+```
+
+Each test uses an isolated temporary directory (`LOG_FILE` inside the
+temp dir) and cleans up afterwards. Test dependencies (doctest, Python)
+are separate from runtime dependencies — `logamuffin` itself still has no
+runtime dependencies.
+
+The legacy Bash harness is preserved for compatibility and is superseded
+by the Python suite:
+
+```bash
+LOG_BIN=./build/logamuffin bash test.sh
+```
+
+Continuous integration (`.github/workflows/ci.yml`) runs `./run_tests.sh`
+on `push` and `pull_request` across `ubuntu-latest`, `macos-latest`, and
+`windows-latest` in `release`/`debug` configurations, plus a sanitizer job
+on Linux. See [docs/TESTING.md](docs/TESTING.md) for the testing
+architecture and how coverage maps to the requirements.
+
 ## Design philosophy
 
 Logamuffin aims to be a small, dependable utility that does one thing well.
