@@ -59,8 +59,6 @@ inline constexpr std::array<LevelInfo, 7> kBuiltinLevels{{
     {"ERROR",    ANSI_RED,   Level::Error},
     {"CRITICAL", ANSI_PURPLE,   Level::Critical}
 }};
-// Back-compat alias (historic name).
-inline constexpr const std::array<LevelInfo, 7>& levels = kBuiltinLevels;
 
 std::string uppercase(std::string s);
 std::string basename(std::string path);
