@@ -59,33 +59,45 @@ On Windows, run the integration suite directly:
 EOF
 }
 
-while (( $# > 0 )); do
+while (($# > 0)); do
     case "$1" in
-        --executable)
-            EXECUTABLE="${2:-}"
-            shift 2
-            ;;
-        --executable=*)
-            EXECUTABLE="${1#--executable=}"
-            shift
-            ;;
-        --skip-unit)
-            SKIP_UNIT="true"; shift ;;
-        --skip-integration)
-            SKIP_INTEGRATION="true"; shift ;;
-        --clean)
-            CLEAN="true"; shift ;;
-        --verbose)
-            VERBOSE="true"; shift ;;
-        -v)
-            VERBOSE="true"; shift ;;
-        --help|-h)
-            usage; exit 0 ;;
-        *)
-            echo "ERROR: unknown argument: $1" >&2
-            usage >&2
-            exit 2
-            ;;
+    --executable)
+        EXECUTABLE="${2:-}"
+        shift 2
+        ;;
+    --executable=*)
+        EXECUTABLE="${1#--executable=}"
+        shift
+        ;;
+    --skip-unit)
+        SKIP_UNIT="true"
+        shift
+        ;;
+    --skip-integration)
+        SKIP_INTEGRATION="true"
+        shift
+        ;;
+    --clean)
+        CLEAN="true"
+        shift
+        ;;
+    --verbose)
+        VERBOSE="true"
+        shift
+        ;;
+    -v)
+        VERBOSE="true"
+        shift
+        ;;
+    --help | -h)
+        usage
+        exit 0
+        ;;
+    *)
+        echo "ERROR: unknown argument: $1" >&2
+        usage >&2
+        exit 2
+        ;;
     esac
 done
 

@@ -312,7 +312,10 @@ cmd "LOG_COLOR=0 INFO \"plain message (no color codes)\""
 LOG_COLOR=0 "$LOGGER" INFO "plain message (no color codes)"
 
 cmd "(unset LOG_COLOR) INFO \"auto: captured output is plain, TTY colors\""
-( unset LOG_COLOR; LOG_LEVEL=TRACE "$LOGGER" INFO "auto color: captured is plain (TTY would color)" )
+(
+    unset LOG_COLOR
+    LOG_LEVEL=TRACE "$LOGGER" INFO "auto color: captured is plain (TTY would color)"
+)
 
 cmd "LOG_SOURCE=my-app.sh INFO \"custom source label\""
 LOG_SOURCE="my-app.sh" "$LOGGER" INFO "custom source label"
@@ -521,7 +524,7 @@ JSON
 
 printf '  --- ./.logamuffin present (NOTICE=5, level INFO) ---\n'
 cmd "(cd disc && LOG_FILE=disc.log LOG_LEVEL=INFO logamuffin NOTICE) -> filtered (no output)"
-( cd "$DEMO_TMP/disc" && LOG_FILE="$DEMO_TMP/disc.log" LOG_LEVEL=INFO "$LOGGER" NOTICE "autodiscovered NOTICE filtered" >"$DEMO_TMP/disc1.out" 2>"$DEMO_TMP/disc1.err" )
+(cd "$DEMO_TMP/disc" && LOG_FILE="$DEMO_TMP/disc.log" LOG_LEVEL=INFO "$LOGGER" NOTICE "autodiscovered NOTICE filtered" >"$DEMO_TMP/disc1.out" 2>"$DEMO_TMP/disc1.err")
 printf '  (autodiscovered output: %s bytes; empty = filtered)\n' "$(cat "$DEMO_TMP/disc1.out" "$DEMO_TMP/disc1.err" | wc -c | tr -d ' ')"
 
 cat >"$DEMO_TMP/explicit.json" <<'JSON'
@@ -530,11 +533,11 @@ JSON
 
 printf '  --- --config explicit.json (NOTICE=25) overrides autodiscovered 5 ---\n'
 cmd "(cd disc && logamuffin --config explicit.json NOTICE)"
-( cd "$DEMO_TMP/disc" && LOG_FILE="$DEMO_TMP/disc.log" LOG_LEVEL=INFO "$LOGGER" --config "$DEMO_TMP/explicit.json" NOTICE "explicit NOTICE passes (25)" )
+(cd "$DEMO_TMP/disc" && LOG_FILE="$DEMO_TMP/disc.log" LOG_LEVEL=INFO "$LOGGER" --config "$DEMO_TMP/explicit.json" NOTICE "explicit NOTICE passes (25)")
 
 printf '  --- LOG_CONFIG explicit.json also wins over autodiscovery ---\n'
 cmd "(cd disc && LOG_CONFIG=explicit.json logamuffin NOTICE)"
-( cd "$DEMO_TMP/disc" && LOG_FILE="$DEMO_TMP/disc.log" LOG_LEVEL=INFO LOG_CONFIG="$DEMO_TMP/explicit.json" "$LOGGER" NOTICE "via LOG_CONFIG over autodiscovery" )
+(cd "$DEMO_TMP/disc" && LOG_FILE="$DEMO_TMP/disc.log" LOG_LEVEL=INFO LOG_CONFIG="$DEMO_TMP/explicit.json" "$LOGGER" NOTICE "via LOG_CONFIG over autodiscovery")
 
 printf '  --- environment overrides the winning file (color) ---\n'
 cmd "LOG_LEVEL_COLOR_NOTICE=green --config explicit.json NOTICE (green wins over blue)"
@@ -547,14 +550,17 @@ JSON
 printf '  --- environment overrides the file threshold ---\n'
 note 'File threshold needs LOG_LEVEL unset (demo global is TRACE).'
 cmd "(unset LOG_LEVEL) --config threshold-file.json INFO -> filtered (file ERROR)"
-( unset LOG_LEVEL; "$LOGGER" --config "$DEMO_TMP/threshold-file.json" INFO "file ERROR filters INFO" )
+(
+    unset LOG_LEVEL
+    "$LOGGER" --config "$DEMO_TMP/threshold-file.json" INFO "file ERROR filters INFO"
+)
 
 cmd "LOG_LEVEL=TRACE --config threshold-file.json INFO -> shown (env TRACE wins)"
 LOG_LEVEL=TRACE "$LOGGER" --config "$DEMO_TMP/threshold-file.json" INFO "env TRACE wins over file ERROR"
 
 printf '  --- no autodiscovered file: defaults apply ---\n'
 cmd "(cd empty && logamuffin INFO) (missing ./.logamuffin = defaults)"
-( cd "$DEMO_TMP/empty" && LOG_FILE="$DEMO_TMP/empty.log" LOG_LEVEL=TRACE "$LOGGER" INFO "missing autodiscovery uses defaults" )
+(cd "$DEMO_TMP/empty" && LOG_FILE="$DEMO_TMP/empty.log" LOG_LEVEL=TRACE "$LOGGER" INFO "missing autodiscovery uses defaults")
 
 note 'Note: a malformed autodiscovered ./.logamuffin is an error (exit 2),'
 note 'not a silent fallback to defaults.'
@@ -590,7 +596,7 @@ printf '  (filtered.log %s bytes; 0 = nothing appended)\n' "$(cat "$DEMO_TMP/fil
 mkdir -p "$DEMO_TMP/default"
 printf '  --- default .logs/log.log (no LOG_FILE, cwd-relative) ---\n'
 cmd "(cd default && unset LOG_FILE && logamuffin INFO) creates .logs/log.log"
-( cd "$DEMO_TMP/default" && unset LOG_FILE && LOG_LEVEL=TRACE LOG_COLOR=0 "$LOGGER" INFO "default file path" )
+(cd "$DEMO_TMP/default" && unset LOG_FILE && LOG_LEVEL=TRACE LOG_COLOR=0 "$LOGGER" INFO "default file path")
 printf '  --- default/.logs/log.log ---\n'
 cat "$DEMO_TMP/default/.logs/log.log"
 

@@ -12,41 +12,68 @@
 #include <utility>
 #include <vector>
 
-namespace logamuffin {
+namespace logamuffin
+{
 
-struct JsonValue {
-    enum class Type { Null, Bool, Number, String, Array, Object };
-    Type type = Type::Null;
-    bool boolValue = false;
+  struct JsonValue
+  {
+    enum class Type
+    {
+      Null,
+      Bool,
+      Number,
+      String,
+      Array,
+      Object
+    };
+    Type type          = Type::Null;
+    bool boolValue     = false;
     double numberValue = 0.0;
     std::string stringValue;
     std::vector<JsonValue> arrayValue;
     std::vector<std::pair<std::string, JsonValue>> objectValue;
 
-    bool isObject() const { return type == Type::Object; }
-    const JsonValue* find(const std::string& key) const {
-        if (type != Type::Object)
-            return nullptr;
-        for (const auto& kv : objectValue)
-            if (kv.first == key)
-                return &kv.second;
-        return nullptr;
+    bool isObject() const
+    {
+      return type == Type::Object;
     }
-};
+    const JsonValue* find(const std::string& key) const
+    {
+      if (type != Type::Object)
+      {
+        return nullptr;
+      }
+      for (const auto& kv: objectValue)
+      {
+        if (kv.first == key)
+        {
+          return &kv.second;
+        }
+      }
+      return nullptr;
+    }
+  };
 
-struct JsonParseError {
+  struct JsonParseError
+  {
     std::string message;
     std::size_t pos = 0;
-};
+  };
 
-class JsonParser {
-public:
+  class JsonParser
+  {
+  public:
     explicit JsonParser(std::string text);
 
     bool parse(JsonValue& out, JsonParseError& err);
 
-private:
-    enum class SeparatorResult { Continue, Done, Error };
+  private:
+    enum class SeparatorResult
+    {
+      Continue,
+      Done,
+      Error
+    };
 
     std::string text_;
     std::size_t pos_ = 0;
@@ -57,26 +84,23 @@ private:
     char consume();
     bool skipIgnored(JsonParseError& err);
     bool parseValue(JsonValue& out, JsonParseError& err, int depth);
-    bool parseLiteral(const std::string& lit, bool boolVal, JsonValue& out,
-                      JsonParseError& err);
+    bool parseLiteral(const std::string& lit, bool boolVal, JsonValue& out, JsonParseError& err);
     bool parseNumber(JsonValue& out, JsonParseError& err);
     static void appendUtf8(std::string& out, unsigned int cp);
     bool parseHex4(JsonParseError& err, unsigned int& value);
     bool parseString(std::string& out, JsonParseError& err);
     bool parseEscape(std::string& out, JsonParseError& err);
     bool parseUnicodeEscape(std::string& out, JsonParseError& err);
-    bool parseSurrogatePair(unsigned int high, std::string& out,
-                            JsonParseError& err);
+    bool parseSurrogatePair(unsigned int high, std::string& out, JsonParseError& err);
     bool tryConsumeEmptyContainer(char closeChar);
-    SeparatorResult consumeElementSeparator(char closeChar,
-                                            JsonParseError& err);
+    SeparatorResult consumeElementSeparator(char closeChar, JsonParseError& err);
     bool parseObject(JsonValue& out, JsonParseError& err, int depth);
     bool parseArray(JsonValue& out, JsonParseError& err, int depth);
-};
+  };
 
-std::string json_location(const std::string& text, std::size_t pos);
+  std::string json_location(const std::string& text, std::size_t pos);
 
-bool json_number_to_int(const JsonValue& value, int& out);
-bool json_scalar_to_int(const JsonValue& value, int& out);
+  bool json_number_to_int(const JsonValue& value, int& out);
+  bool json_scalar_to_int(const JsonValue& value, int& out);
 
 } // namespace logamuffin

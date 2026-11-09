@@ -13,12 +13,12 @@
 
 #include "log_levels.hpp"
 
-namespace logamuffin {
+namespace logamuffin
+{
 
-// Loads configuration into cfg. cliConfigPath is the --config value when
-// present; otherwise LOG_CONFIG/LOGAMUFFIN_CONFIG/ ./.logamuffin is
-// probed. Returns false with a user-facing message in err on failure.
-bool load_config(const std::optional<std::string>& cliConfigPath,
-                Config& cfg, std::string& err);
+  // Loads configuration into cfg. cliConfigPath is the --config value when
+  // present; otherwise LOG_CONFIG/LOGAMUFFIN_CONFIG/ ./.logamuffin is
+  // probed. Returns false with a user-facing message in err on failure.
+  bool load_config(const std::optional<std::string>& cliConfigPath, Config& cfg, std::string& err);
 
 } // namespace logamuffin

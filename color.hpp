@@ -8,12 +8,12 @@
 
 #include <string>
 
-namespace logamuffin {
+namespace logamuffin
+{
 
-// Resolves specRaw ("blue", "#ff8800", "31", "[0;31m", "\033[0;31m", ...)
-// into an ANSI escape in outEscape. Returns false with a short message
-// in err when the specification is unknown or malformed.
-bool resolve_color(const std::string& specRaw, std::string& outEscape,
-                  std::string& err);
+  // Resolves specRaw ("blue", "#ff8800", "31", "[0;31m", "\033[0;31m", ...)
+  // into an ANSI escape in outEscape. Returns false with a short message
+  // in err when the specification is unknown or malformed.
+  bool resolve_color(const std::string& specRaw, std::string& outEscape, std::string& err);
 
 } // namespace logamuffin

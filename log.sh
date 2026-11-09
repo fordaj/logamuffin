@@ -85,7 +85,7 @@ log() {
     local caller_file="${BASH_SOURCE[1]:-}"
     local caller_line="${BASH_LINENO[0]:-1}"
     local caller_func=""
-    if (( ${#FUNCNAME[@]} > 1 )); then
+    if ((${#FUNCNAME[@]} > 1)); then
         caller_func="${FUNCNAME[1]:-}"
     fi
     if [[ -z "$caller_file" ]]; then

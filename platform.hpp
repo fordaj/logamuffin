@@ -11,15 +11,15 @@
 #include <filesystem>
 #include <string>
 
-namespace logamuffin {
+namespace logamuffin
+{
 
-std::string hostname();
-bool terminal(FILE* stream);
-int terminal_width();
+  std::string hostname();
+  bool terminal(FILE* stream);
+  int terminal_width();
 
-// Appends entry to path with an exclusive lock so concurrent writers do
-// not interleave. Returns false on open/lock/write/close failure.
-bool append_locked(const std::filesystem::path& path,
-                  const std::string& entry);
+  // Appends entry to path with an exclusive lock so concurrent writers do
+  // not interleave. Returns false on open/lock/write/close failure.
+  bool append_locked(const std::filesystem::path& path, const std::string& entry);
 
 } // namespace logamuffin

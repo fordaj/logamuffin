@@ -80,3 +80,6 @@ Testing/
 # Python (integration tests)
 __pycache__/
 *.py[cod]
+
+# Python tooling (uv / formattington)
+.venv/

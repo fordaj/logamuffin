@@ -4,10 +4,10 @@ Logamuffin has two test suites that together cover correctness, CLI
 behavior, and cross-platform compatibility — without adding any runtime
 dependency for Logamuffin users.
 
-| Suite | Location | Framework | What it tests |
-| ----- | -------- | --------- | ------------- |
-| **C++ unit tests** | `tests/unit/test_logamuffin.cpp` | [doctest](https://github.com/doctest/doctest) 2.5.3 (vendored) | Severity parsing, filtering, configuration, message formatting, output formatting |
-| **CLI integration tests** | `tests/integration/test_cli.py` | Python standard library (`unittest`) | Arguments, aliases, env vars, stdout/stderr, files, colors, messages, concurrency, exit codes |
+| Suite                     | Location                         | Framework                                                      | What it tests                                                                                 |
+| ------------------------- | -------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **C++ unit tests**        | `tests/unit/test_logamuffin.cpp` | [doctest](https://github.com/doctest/doctest) 2.5.3 (vendored) | Severity parsing, filtering, configuration, message formatting, output formatting             |
+| **CLI integration tests** | `tests/integration/test_cli.py`  | Python standard library (`unittest`)                           | Arguments, aliases, env vars, stdout/stderr, files, colors, messages, concurrency, exit codes |
 
 There is **one command** to run everything:
 
@@ -170,7 +170,7 @@ file format. Unit tests need `logamuffin.hpp` plus the core sources.
 
 ### What is covered where
 
-**Unit tests** (`tests/unit/test_logamuffin.cpp`) test *pure helpers*:
+**Unit tests** (`tests/unit/test_logamuffin.cpp`) test _pure helpers_:
 case conversion, path basenames, all level names + aliases +
 case-insensitivity, numeric built-in values (`-1`, `5`, `10`, `20`,
 `30`, `40`, `50`), invalid-name rejection, numeric ordering,
@@ -181,11 +181,11 @@ table, message joining, file and console formatting (including the
 `YYYY-MM-DD HH:MM:SS,mmm` timestamp shape.
 
 **Integration tests** (`tests/integration/test_cli.py`, many with
-`subTest`s) test *observable behavior*:
+`subTest`s) test _observable behavior_:
 
 - Arguments & validation: `--version`, missing/incomplete args,
   unknown level (lists valid levels and numeric hint), `--version
-  extra`, lowercase levels, empty message.
+extra`, lowercase levels, empty message.
 - Numeric levels (issue #3): builtin numbers resolve to categories,
   unknown numbers are ad-hoc `[25]` levels, custom categories resolve
   by number, numeric filtering/streams, `-1`/`-- -1`/`+50` handling,
@@ -272,4 +272,3 @@ docs/TESTING.md                    this file
 build/                             ignored outputs: build/debug/,
                                  build/release/<platform>/
 ```
-

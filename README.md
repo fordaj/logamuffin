@@ -223,17 +223,17 @@ recapture `image.png` from the new run.
 
 Logamuffin uses environment variables, an optional JSON config file, and a `--config` option so you can customize its behavior without recompiling the executable.
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `LOG_LEVEL` | `INFO` | Minimum severity to display (a category name or numeric value) |
-| `LOG_COLOR` | Automatic/default behavior | Controls colored terminal output (`1`/`TRUE`/`YES`/`ON` enable, anything else disables) |
-| `LOG_FILE` | `.logs/log.log` | Path to the persistent log file |
-| `LOG_SOURCE` | Implementation default | Controls source information in log output |
-| `LOG_CONFIG` | — | Path to a JSON config file (same as `--config`) |
-| `LOG_LEVELS` | — | Custom categories, e.g. `NOTICE=25:blue,INFO=20:green` |
-| `LOG_CATEGORIES` | — | Alias for `LOG_LEVELS` (`LOG_LEVELS` wins per entry if both are set) |
-| `LOG_LEVEL_VALUE_<NAME>` | — | Numeric value for a single category, e.g. `LOG_LEVEL_VALUE_NOTICE=25` |
-| `LOG_LEVEL_COLOR_<NAME>` | — | Color for a single category, e.g. `LOG_LEVEL_COLOR_NOTICE=blue` |
+| Variable                 | Default                    | Description                                                                             |
+| ------------------------ | -------------------------- | --------------------------------------------------------------------------------------- |
+| `LOG_LEVEL`              | `INFO`                     | Minimum severity to display (a category name or numeric value)                          |
+| `LOG_COLOR`              | Automatic/default behavior | Controls colored terminal output (`1`/`TRUE`/`YES`/`ON` enable, anything else disables) |
+| `LOG_FILE`               | `.logs/log.log`            | Path to the persistent log file                                                         |
+| `LOG_SOURCE`             | Implementation default     | Controls source information in log output                                               |
+| `LOG_CONFIG`             | —                          | Path to a JSON config file (same as `--config`)                                         |
+| `LOG_LEVELS`             | —                          | Custom categories, e.g. `NOTICE=25:blue,INFO=20:green`                                  |
+| `LOG_CATEGORIES`         | —                          | Alias for `LOG_LEVELS` (`LOG_LEVELS` wins per entry if both are set)                    |
+| `LOG_LEVEL_VALUE_<NAME>` | —                          | Numeric value for a single category, e.g. `LOG_LEVEL_VALUE_NOTICE=25`                   |
+| `LOG_LEVEL_COLOR_<NAME>` | —                          | Color for a single category, e.g. `LOG_LEVEL_COLOR_NOTICE=blue`                         |
 
 The spellings `LOG_LEVEL_<NAME>_VALUE` / `LOG_LEVEL_<NAME>_COLOR` are also accepted, and all `LOG_*` category variables have `LOGAMUFFIN_*` equivalents (e.g. `LOGAMUFFIN_LEVELS`). Later sources win over earlier ones (see [Configuration precedence](#configuration-precedence)).
 
@@ -323,10 +323,10 @@ Example `.logamuffin` file:
   "color": true,
   "file": ".logs/log.log",
   "levels": {
-    "TRACE": {"value": 5, "color": "cyan"},
-    "INFO": {"value": 20, "color": "reset"},
-    "NOTICE": {"value": 25, "color": "blue"},
-    "ERROR": {"value": 40, "color": "bold-red"}
+    "TRACE": { "value": 5, "color": "cyan" },
+    "INFO": { "value": 20, "color": "reset" },
+    "NOTICE": { "value": 25, "color": "blue" },
+    "ERROR": { "value": 40, "color": "bold-red" }
   }
 }
 ```
@@ -344,8 +344,8 @@ Supported top-level keys (all optional, unknown keys are ignored):
 ```json
 {
   "levels": [
-    {"name": "NOTICE", "value": 25, "color": "blue"},
-    {"name": "HEARTBEAT", "value": 3, "color": "#ff8800"}
+    { "name": "NOTICE", "value": 25, "color": "blue" },
+    { "name": "HEARTBEAT", "value": 3, "color": "#ff8800" }
   ]
 }
 ```
@@ -479,6 +479,47 @@ LOG_BIN=/path/to/logamuffin python3 tests/integration/test_cli.py
 
 See [docs/TESTING.md](docs/TESTING.md) for the testing architecture,
 what each suite covers, and how to add tests.
+
+## Formatting
+
+Logamuffin keeps Markdown, C/C++, and shell files consistently formatted
+with [formattington](https://github.com/fordaj/formattington), which
+orchestrates [Prettier](https://prettier.io/),
+[clang-format](https://clang.llvm.org/docs/ClangFormat.html), and
+[shfmt](https://github.com/mvdan/sh) under one interface.
+
+Format everything in place:
+
+```bash
+./format.bash
+```
+
+Check formatting without modifying files (as CI does):
+
+```bash
+./ci/format_check.bash
+```
+
+Both commands run `uv run formattington all` with the commands declared in
+`.formattington.json`:
+
+| File types                             | Tool           |
+| -------------------------------------- | -------------- |
+| Markdown (`*.md`)                      | `prettier`     |
+| C/C++ (`*.cpp`, `*.hpp`, `*.h`, `*.c`) | `clang-format` |
+| Shell (`*.sh`, `*.bash`)               | `shfmt -i 4`   |
+
+C/C++ and Markdown style live in `.clang-format` and `.prettierrc` at the
+repo root. The vendored third-party header under `tools/doctest/` is
+skipped (as are `build/` and other generated locations).
+
+Requirements: [uv](https://docs.astral.sh/uv/) plus the formatter
+executables on `PATH` (`prettier` via `npm install -g prettier`).
+Formattington itself is pinned in `pyproject.toml` / `uv.lock` and runs on
+Python 3.14 (see `.python-version`), the latest version it supports — no
+`pip install` is needed; `uv run` creates `.venv/` automatically. To bump
+formattington, update the commit in `pyproject.toml` and run `uv lock`
+and `uv sync`.
 
 ## Design philosophy
 

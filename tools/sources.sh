@@ -2,20 +2,20 @@
 # Add a translation unit here only; UNIT_SOURCES is derived as intersection.
 # shellcheck shell=bash
 SOURCES=(
-  logamuffin.cpp
-  logamuffin_core.cpp
-  text_utils.cpp
-  json_parser.cpp
-  color.cpp
-  log_levels.cpp
-  config.cpp
-  platform.cpp
+    logamuffin.cpp
+    logamuffin_core.cpp
+    text_utils.cpp
+    json_parser.cpp
+    color.cpp
+    log_levels.cpp
+    config.cpp
+    platform.cpp
 )
 # Core units needed by the doctest suite (subset of SOURCES).
 UNIT_SOURCES=(
-  logamuffin_core.cpp
-  text_utils.cpp
-  log_levels.cpp
+    logamuffin_core.cpp
+    text_utils.cpp
+    log_levels.cpp
 )
 # Native compiler + flags for dev/test builds (run_tests.sh).
 CXX="${CXX:-clang++}"
