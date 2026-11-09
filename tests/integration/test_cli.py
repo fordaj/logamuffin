@@ -66,8 +66,12 @@ DOCUMENTED_LEVELS = (
 )
 STDOUT_LEVELS = ("TRACE", "DEBUG", "INFO", "WARNING")
 STDERR_LEVELS = ("ERROR", "CRITICAL", "FATAL")
-WARN_ALIASES = ("WARN", "WARNING", "warn", "warning")
-CRITICAL_ALIASES = ("FATAL", "CRITICAL", "fatal", "critical")
+def _aliases(canonical: str, alias: str) -> tuple[str, ...]:
+    return (canonical, alias, canonical.lower(), alias.lower())
+
+
+WARN_ALIASES = _aliases("WARN", "WARNING")
+CRITICAL_ALIASES = _aliases("CRITICAL", "FATAL")
 
 # (threshold LOG_LEVEL, emitted LEVEL, should_keep)
 THRESHOLD_FILTER_CASES = (
@@ -150,6 +154,12 @@ FILE_LINE_RE = re.compile(
 )
 
 
+def read_log_file(path: Path) -> str:
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
 class LogamuffinTestCase(unittest.TestCase):
     """Base class with isolated temp dir and a subprocess runner."""
 
@@ -199,9 +209,7 @@ class LogamuffinTestCase(unittest.TestCase):
         )
 
     def read_log(self) -> str:
-        if not self.log_file.is_file():
-            return ""
-        return self.log_file.read_text(encoding="utf-8", errors="replace")
+        return read_log_file(self.log_file)
 
     # ------------------------------------------------------------------
     # Assertion helpers (arrange: env -> run -> assert in one line)
@@ -352,7 +360,7 @@ class TestSeverityAliasesAndFiltering(LogamuffinTestCase):
                     LOG_FILE=str(log),
                 )
                 self.assertEqual(result.returncode, 0)
-                content = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
+                content = read_log_file(log)
                 if expected_kept:
                     self.assertIn(f"m-{threshold}-{level}", content)
                 else:
@@ -362,11 +370,11 @@ class TestSeverityAliasesAndFiltering(LogamuffinTestCase):
         log = self.dir / "always.log"
         result = self.run_bin(
             ["ALWAYS", "always-bypass"],
-            LOG_LEVEL="CRITICAL", LOG_COLOR="0", LOG_FILE=str(log),
+            LOG_LEVEL="CRITICAL", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("always-bypass", result.stdout)
-        self.assertIn("always-bypass", log.read_text(encoding="utf-8", errors="replace"))
+        self.assertIn("always-bypass", read_log_file(log))
 
     def test_filtered_messages_still_exit_zero(self) -> None:
         result = self.run_bin(["TRACE", "filtered"], LOG_LEVEL="INFO")
@@ -394,7 +402,7 @@ class TestEnvironmentConfiguration(LogamuffinTestCase):
                 level = "DEBUG" if "debug" in threshold.lower() else "WARNING"
                 result = self.run_bin(
                     [level, f"env-{threshold}"],
-                    LOG_LEVEL=threshold, LOG_COLOR="0",
+                    LOG_LEVEL=threshold, LOG_COLOR=COLOR_PLAIN,
                 )
                 self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
                 self.assertIn(f"env-{threshold}", result.stdout)
@@ -408,7 +416,7 @@ class TestEnvironmentConfiguration(LogamuffinTestCase):
         self.assertEqual(result.returncode, 0)
         default_log = self.dir / ".logs" / "log.log"
         self.assertTrue(default_log.is_file(), "default .logs/log.log should be created")
-        self.assertIn("default-file-msg", default_log.read_text(encoding="utf-8", errors="replace"))
+        self.assertIn("default-file-msg", read_log_file(default_log))
 
     def test_empty_log_file_falls_back_to_default(self) -> None:
         result = self.run_bin(
@@ -419,19 +427,19 @@ class TestEnvironmentConfiguration(LogamuffinTestCase):
         self.assertEqual(result.returncode, 0)
         default_log = self.dir / ".logs" / "log.log"
         self.assertTrue(default_log.is_file())
-        self.assertIn("empty-logfile-msg", default_log.read_text(encoding="utf-8", errors="replace"))
+        self.assertIn("empty-logfile-msg", read_log_file(default_log))
 
     def test_log_source_overrides_source_name(self) -> None:
         result = self.run_bin(
             ["INFO", "src-test"],
-            LOG_SOURCE="/some/dir/custom.sh", LOG_COLOR="0",
+            LOG_SOURCE="/some/dir/custom.sh", LOG_COLOR=COLOR_PLAIN,
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("custom.sh", result.stdout)
         self.assertIn("custom.sh", self.read_log())
 
     def test_log_source_unset_uses_executable_name(self) -> None:
-        result = self.run_bin(["INFO", "src-default"], LOG_SOURCE=None, LOG_COLOR="0")
+        result = self.run_bin(["INFO", "src-default"], LOG_SOURCE=None, LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         exe_name = Path(self.exe).name
         self.assertIn(exe_name, result.stdout)
@@ -461,7 +469,7 @@ class TestOutputStreams(LogamuffinTestCase):
                 self.assertEqual(result.stdout, "")
 
     def test_always_goes_to_stdout(self) -> None:
-        result = self.run_bin(["ALWAYS", "s-ALWAYS"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+        result = self.run_bin(["ALWAYS", "s-ALWAYS"], LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertIn("s-ALWAYS", result.stdout)
         self.assertEqual(result.stderr, "")
@@ -469,8 +477,8 @@ class TestOutputStreams(LogamuffinTestCase):
 
 class TestFileHandling(LogamuffinTestCase):
     def test_log_file_is_created_and_appended_across_invocations(self) -> None:
-        first = self.run_bin(["INFO", "first-msg"], LOG_COLOR="0")
-        second = self.run_bin(["INFO", "second-msg"], LOG_COLOR="0")
+        first = self.run_bin(["INFO", "first-msg"], LOG_COLOR=COLOR_PLAIN)
+        second = self.run_bin(["INFO", "second-msg"], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(first.returncode, 0)
         self.assertEqual(second.returncode, 0)
         lines = self.read_log().splitlines()
@@ -483,10 +491,10 @@ class TestFileHandling(LogamuffinTestCase):
 
     def test_log_file_parent_directories_are_created(self) -> None:
         nested = self.dir / "deep" / "nest" / "log.txt"
-        result = self.run_bin(["INFO", "nested-msg"], LOG_FILE=str(nested), LOG_COLOR="0")
+        result = self.run_bin(["INFO", "nested-msg"], LOG_FILE=str(nested), LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertTrue(nested.is_file())
-        self.assertIn("nested-msg", nested.read_text(encoding="utf-8", errors="replace"))
+        self.assertIn("nested-msg", read_log_file(nested))
 
     def test_filtered_messages_do_not_create_log_file(self) -> None:
         result = self.run_bin(["TRACE", "filtered"], LOG_LEVEL="INFO")
@@ -494,7 +502,7 @@ class TestFileHandling(LogamuffinTestCase):
         self.assertFalse(self.log_file.exists())
 
     def test_log_file_stays_plain_text_when_color_enabled(self) -> None:
-        result = self.run_bin(["INFO", "color-file-msg"], LOG_COLOR="1")
+        result = self.run_bin(["INFO", "color-file-msg"], LOG_COLOR=COLOR_ON)
         self.assertEqual(result.returncode, 0)
         content = self.read_log()
         self.assertIn("color-file-msg", content)
@@ -503,19 +511,19 @@ class TestFileHandling(LogamuffinTestCase):
     def test_log_file_is_directory_warns_but_console_succeeds(self) -> None:
         adir = self.dir / "adir"
         adir.mkdir()
-        result = self.run_bin(["INFO", "dirfile-msg"], LOG_FILE=str(adir), LOG_COLOR="0")
+        result = self.run_bin(["INFO", "dirfile-msg"], LOG_FILE=str(adir), LOG_COLOR=COLOR_PLAIN)
         # Console output still succeeds; only the file append fails.
         self.assertEqual(result.returncode, 0)
         self.assertIn("dirfile-msg", result.stdout)
         self.assertIn("failed to append", result.stderr)
 
     def test_version_does_not_write_log_file(self) -> None:
-        result = self.run_bin(["--version"], LOG_COLOR="0")
+        result = self.run_bin(["--version"], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertFalse(self.log_file.exists())
 
     def test_log_file_line_matches_documented_format(self) -> None:
-        result = self.run_bin(["INFO", "format-msg"], LOG_COLOR="0")
+        result = self.run_bin(["INFO", "format-msg"], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         lines = self.read_log().splitlines()
         self.assertEqual(len(lines), 1)
@@ -558,21 +566,21 @@ class TestColorBehavior(LogamuffinTestCase):
 
 class TestMessageHandling(LogamuffinTestCase):
     def test_multi_argument_message_is_joined_with_single_spaces(self) -> None:
-        result = self.run_bin(["INFO", "hello", "world", "foo"], LOG_COLOR="0")
+        result = self.run_bin(["INFO", "hello", "world", "foo"], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertIn("hello world foo", result.stdout)
         self.assertIn("hello world foo", self.read_log())
 
     def test_multiline_message_preserves_line_breaks(self) -> None:
         message = "MULTI_FIRST\nMULTI_SECOND\nMULTI_THIRD"
-        result = self.run_bin(["INFO", message], LOG_COLOR="0")
+        result = self.run_bin(["INFO", message], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         for segment in ("MULTI_FIRST", "MULTI_SECOND", "MULTI_THIRD"):
             self.assertIn(segment, result.stdout)
             self.assertIn(segment, self.read_log())
 
     def test_message_with_carriage_returns_is_cleaned(self) -> None:
-        result = self.run_bin(["INFO", "a\r\nb\r"], LOG_COLOR="0")
+        result = self.run_bin(["INFO", "a\r\nb\r"], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertNotIn("\r", result.stdout)
         self.assertNotIn("\r", self.read_log())
@@ -580,7 +588,7 @@ class TestMessageHandling(LogamuffinTestCase):
 
     def test_message_with_special_characters_is_preserved(self) -> None:
         message = "quote: 'x' \"y\" dollar:$HOME star:* tab:[x]"
-        result = self.run_bin(["INFO", message], LOG_COLOR="0")
+        result = self.run_bin(["INFO", message], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertIn(message, result.stdout)
         self.assertIn(message, self.read_log())
@@ -592,7 +600,7 @@ class TestConcurrentWrites(LogamuffinTestCase):
         with ThreadPoolExecutor(max_workers=count) as pool:
             futures = [
                 pool.submit(
-                    self.run_bin, ["INFO", f"concurrent-{i}"], LOG_COLOR="0",
+                    self.run_bin, ["INFO", f"concurrent-{i}"], LOG_COLOR=COLOR_PLAIN,
                 )
                 for i in range(count)
             ]
@@ -624,10 +632,10 @@ class TestNumericLevels(LogamuffinTestCase):
                 log = self.dir / f"num-{num}.log"
                 result = self.run_bin(
                     [num, marker],
-                    LOG_LEVEL="TRACE", LOG_COLOR="0", LOG_FILE=str(log),
+                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
                 )
                 self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
-                content = log.read_text(encoding="utf-8", errors="replace")
+                content = read_log_file(log)
                 self.assertIn(f"[{label}]", content)
                 self.assertIn(marker, content)
 
@@ -637,44 +645,44 @@ class TestNumericLevels(LogamuffinTestCase):
                 log = self.dir / f"adhoc-{num}.log"
                 result = self.run_bin(
                     [num, f"adhoc-{num}"],
-                    LOG_LEVEL="0", LOG_COLOR="0", LOG_FILE=str(log),
+                    LOG_LEVEL="0", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
                 )
                 self.assertEqual(result.returncode, 0)
-                content = log.read_text(encoding="utf-8", errors="replace")
+                content = read_log_file(log)
                 self.assertIn(f"[{num}]", content)
 
     def test_numeric_resolves_to_custom_category(self) -> None:
         log = self.dir / "custom-num.log"
         result = self.run_bin(
             ["25", "custom-numeric"],
-            LOG_LEVEL="TRACE", LOG_COLOR="0", LOG_FILE=str(log),
+            LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
             LOG_LEVELS="NOTICE=25:blue",
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("[NOTICE]", result.stdout)
-        self.assertIn("custom-numeric", log.read_text(encoding="utf-8", errors="replace"))
+        self.assertIn("custom-numeric", read_log_file(log))
 
     def test_numeric_filtering_uses_number(self) -> None:
         log = self.dir / "num-filter.log"
         filtered = self.run_bin(
             ["20", "filtered-num"],
-            LOG_LEVEL="25", LOG_COLOR="0", LOG_FILE=str(log),
+            LOG_LEVEL="25", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
         )
         shown = self.run_bin(
             ["28", "shown-num"],
-            LOG_LEVEL="25", LOG_COLOR="0", LOG_FILE=str(log),
+            LOG_LEVEL="25", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
         )
         self.assertEqual(filtered.returncode, 0)
         self.assertEqual(filtered.stdout, "")
         self.assertEqual(shown.returncode, 0)
         self.assertIn("shown-num", shown.stdout)
-        self.assertNotIn("filtered-num", log.read_text(encoding="utf-8", errors="replace") if log.is_file() else "")
+        self.assertNotIn("filtered-num", read_log_file(log))
 
     def test_numeric_streams_by_value(self) -> None:
-        stdout_result = self.run_bin(["25", "low-stdout"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+        stdout_result = self.run_bin(["25", "low-stdout"], LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertIn("low-stdout", stdout_result.stdout)
         self.assertEqual(stdout_result.stderr, "")
-        stderr_result = self.run_bin(["45", "high-stderr"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+        stderr_result = self.run_bin(["45", "high-stderr"], LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertIn("high-stderr", stderr_result.stderr)
         self.assertEqual(stderr_result.stdout, "")
 
@@ -682,19 +690,19 @@ class TestNumericLevels(LogamuffinTestCase):
         log = self.dir / "minus-one.log"
         result = self.run_bin(
             ["-1", "bypass-num"],
-            LOG_LEVEL="CRITICAL", LOG_COLOR="0", LOG_FILE=str(log),
+            LOG_LEVEL="CRITICAL", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("[ALWAYS]", result.stdout)
         self.assertIn("bypass-num", result.stdout)
 
     def test_dashdash_minus_one_also_bypasses(self) -> None:
-        result = self.run_bin(["--", "-1", "dashdash-bypass"], LOG_LEVEL="CRITICAL", LOG_COLOR="0")
+        result = self.run_bin(["--", "-1", "dashdash-bypass"], LOG_LEVEL="CRITICAL", LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertIn("dashdash-bypass", result.stdout)
 
     def test_plus_number_resolves(self) -> None:
-        result = self.run_bin(["+50", "plus-msg"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+        result = self.run_bin(["+50", "plus-msg"], LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertIn("[CRITICAL]", result.stderr)
 
@@ -750,7 +758,7 @@ class TestLogHelper(LogamuffinTestCase):
             'source "$LOGAMUFFIN_HELPER"\n'
             'log INFO "helper-word-msg"\n'
         )
-        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
         self.assertIn("helper-word-msg", result.stdout)
         self.assertIn("[INFO]", result.stdout)
@@ -766,7 +774,7 @@ class TestLogHelper(LogamuffinTestCase):
             'log 50 "helper-numeric-msg"\n'
             'log 25 "helper-adhoc-msg"\n'
         )
-        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
         self.assertIn("helper-numeric-msg", result.stderr)
         self.assertIn("[CRITICAL]", result.stderr)
@@ -779,7 +787,7 @@ class TestLogHelper(LogamuffinTestCase):
             'myfunc() { log DEBUG "inside-func"; }\n'
             'myfunc\n'
         )
-        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertIn("inside-func", result.stdout)
         self.assertIn("myfunc", result.stdout)
@@ -791,7 +799,7 @@ class TestLogHelper(LogamuffinTestCase):
             'log BOGUS "x"\n'
             'printf "rc=%s" "$?"\n'
         )
-        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN)
         self.assertIn("Unknown log level: BOGUS", result.stderr)
         self.assertIn("rc=2", result.stdout)
 
@@ -801,7 +809,7 @@ class TestLogHelper(LogamuffinTestCase):
             'log TRACE "trace-should-filter"\n'
             'log INFO "info-should-show"\n'
         )
-        result = self._run_script(script, LOG_LEVEL="INFO", LOG_COLOR="0")
+        result = self._run_script(script, LOG_LEVEL="INFO", LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertIn("info-should-show", result.stdout)
         self.assertNotIn("trace-should-filter", result.stdout)
