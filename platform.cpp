@@ -20,74 +20,29 @@ namespace logamuffin {
 
 namespace {
 
-// Width assumed when the terminal size cannot be determined.
-constexpr int kFallbackTerminalWidth = 120;
+// Width assumed when the terminal size cannot be determined. This is
+// independent of console format widths (kMediumFormatWidth in
+// logamuffin.hpp): it is only the TTY fallback, not a layout rule.
+constexpr int kTerminalWidthFallback = 120;
 
-} // namespace
+// POSIX hostname buffer; 256 covers DNS names without truncation for
+// typical hosts.
+constexpr std::size_t kHostnameBufferSize = 256;
 
-std::string hostname() {
-    std::string result;
+// mDNS suffix stripped from hostnames so output reads "my-mac" not
+// "my-mac.local" in log lines.
+constexpr std::string_view kLocalSuffix = ".local";
+
+// Default mode for a newly created log file (readable, appendable by
+// owner; respects umask).
+constexpr int kLogFilePerms = 0666;
 
 #ifdef _WIN32
-    char buffer[MAX_COMPUTERNAME_LENGTH + 1]{};
-    DWORD size = sizeof(buffer);
-
-    if (GetComputerNameA(buffer, &size))
-        result.assign(buffer, size);
-#else
-    char buffer[256]{};
-
-    if (gethostname(buffer, sizeof(buffer) - 1) == 0)
-        result = buffer;
-#endif
-
-    constexpr std::string_view suffix = ".local";
-
-    if (result.size() >= suffix.size() &&
-        result.compare(result.size() - suffix.size(),
-                       suffix.size(), suffix) == 0) {
-        result.resize(result.size() - suffix.size());
-    }
-
-    return result.empty() ? "unknown" : result;
-}
-
-bool terminal(FILE* stream) {
-#ifdef _WIN32
-    const int fd = stream == stderr ? _fileno(stderr) : _fileno(stdout);
-    return _isatty(fd) != 0;
-#else
-    const int fd = stream == stderr ? STDERR_FILENO : STDOUT_FILENO;
-    return isatty(fd) != 0;
-#endif
-}
-
-
-int terminal_width() {
-#ifdef _WIN32
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    if (GetConsoleScreenBufferInfo(out, &info)) {
-        return info.srWindow.Right - info.srWindow.Left + 1;
-    }
-#else
-    struct winsize ws {};
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 &&
-        ws.ws_col > 0) {
-        return ws.ws_col;
-    }
-#endif
-
-    return kFallbackTerminalWidth; // Sensible fallback
-}
-
-bool append_locked(
+// Windows locked append: open -> lock -> seek-end -> write -> unlock ->
+// close. Every failure path closes the handle (no leak on lock failure).
+bool append_locked_windows(
     const std::filesystem::path& path,
-    const std::string& entry)
-{
-
-#ifdef _WIN32
+    const std::string& entry) {
     HANDLE file = CreateFileW(
         path.c_str(),
         GENERIC_WRITE,
@@ -135,47 +90,124 @@ bool append_locked(
 
     CloseHandle(file);
     return success;
-
-    #else
+}
+#else
+// POSIX locked append: open -> flock -> write -> unlock -> close.
+// EINTR retries the write; Windows WriteFile has no EINTR equivalent
+// (its errors are immediate failures, documented here by absence of
+// retry). Every path unlocks (when locked) and closes the fd.
+bool append_locked_posix(
+    const std::filesystem::path& path,
+    const std::string& entry) {
     const int fd = open(
         path.c_str(),
         O_WRONLY | O_CREAT | O_APPEND,
-        0666);
+        static_cast<mode_t>(kLogFilePerms));
 
     if (fd == -1)
         return false;
 
     bool success = false;
 
-    if (flock(fd, LOCK_EX) == 0) {
-        std::size_t written = 0;
-        success = true;
+    if (flock(fd, LOCK_EX) != 0) {
+        close(fd);
+        return false;
+    }
 
-        while (written < entry.size()) {
-            const ssize_t count = write(
-                fd,
-                entry.data() + written,
-                entry.size() - written);
+    std::size_t written = 0;
+    success = true;
 
-            if (count < 0 && errno == EINTR)
-                continue;
+    while (written < entry.size()) {
+        const ssize_t count = write(
+            fd,
+            entry.data() + written,
+            entry.size() - written);
 
-            if (count <= 0) {
-                success = false;
-                break;
-            }
+        if (count < 0 && errno == EINTR)
+            continue;
 
-            written += static_cast<std::size_t>(count);
+        if (count <= 0) {
+            success = false;
+            break;
         }
 
-        if (flock(fd, LOCK_UN) != 0)
-            success = false;
+        written += static_cast<std::size_t>(count);
     }
+
+    if (flock(fd, LOCK_UN) != 0)
+        success = false;
 
     if (close(fd) != 0)
         success = false;
 
     return success;
+}
+#endif
+
+} // namespace
+
+std::string hostname() {
+    std::string result;
+
+#ifdef _WIN32
+    char buffer[MAX_COMPUTERNAME_LENGTH + 1]{};
+    DWORD size = sizeof(buffer);
+
+    if (GetComputerNameA(buffer, &size))
+        result.assign(buffer, size);
+#else
+    char buffer[kHostnameBufferSize]{};
+
+    if (gethostname(buffer, sizeof(buffer) - 1) == 0)
+        result = buffer;
+#endif
+
+    if (result.size() >= kLocalSuffix.size() &&
+        result.compare(result.size() - kLocalSuffix.size(),
+                       kLocalSuffix.size(), kLocalSuffix) == 0) {
+        result.resize(result.size() - kLocalSuffix.size());
+    }
+
+    return result.empty() ? "unknown" : result;
+}
+
+bool terminal(FILE* stream) {
+#ifdef _WIN32
+    const int fd = stream == stderr ? _fileno(stderr) : _fileno(stdout);
+    return _isatty(fd) != 0;
+#else
+    const int fd = stream == stderr ? STDERR_FILENO : STDOUT_FILENO;
+    return isatty(fd) != 0;
+#endif
+}
+
+
+int terminal_width() {
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    if (GetConsoleScreenBufferInfo(out, &info)) {
+        return info.srWindow.Right - info.srWindow.Left + 1;
+    }
+#else
+    struct winsize ws {};
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 &&
+        ws.ws_col > 0) {
+        return ws.ws_col;
+    }
+#endif
+
+    return kTerminalWidthFallback; // Sensible fallback
+}
+
+bool append_locked(
+    const std::filesystem::path& path,
+    const std::string& entry) {
+#ifdef _WIN32
+    return append_locked_windows(path, entry);
+#else
+    return append_locked_posix(path, entry);
 #endif
 }
 
