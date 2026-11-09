@@ -17,12 +17,10 @@ constexpr unsigned char kBomByte0 = 0xEF;
 constexpr unsigned char kBomByte1 = 0xBB;
 constexpr unsigned char kBomByte2 = 0xBF;
 constexpr std::size_t kBomLength = 3;
-constexpr std::size_t kBomSkipOffset = 3;
 
 // Hex escape helpers: \uXXXX decodes 4 hex digits into a code point.
 constexpr int kHexDigitsPerEscape = 4;
 constexpr int kHexShift = 4; // value <<= 4 per digit.
-constexpr unsigned int kHexDigitBase = 10;
 
 // Unicode surrogate ranges (UTF-16): high 0xD800-0xDBFF, low 0xDC00-0xDFFF.
 // A high surrogate must be followed by a low surrogate; combined as
@@ -50,7 +48,7 @@ JsonParser::JsonParser(std::string text) : text_(std::move(text)) {
         static_cast<unsigned char>(text_[0]) == kBomByte0 &&
         static_cast<unsigned char>(text_[1]) == kBomByte1 &&
         static_cast<unsigned char>(text_[2]) == kBomByte2) {
-        pos_ = kBomSkipOffset;
+        pos_ = kBomLength;
     }
 }
 
@@ -158,70 +156,47 @@ bool JsonParser::parseLiteral(const std::string& lit, bool boolVal, JsonValue& o
 }
 
 // ---------------------------------------------------------------------------
-// Numbers: sign | int | frac | exp | convert (each step may bail early)
+// Numbers: sign | int | frac | exp | convert
 // ---------------------------------------------------------------------------
 
-bool JsonParser::skipNumberSign() {
+bool JsonParser::parseNumber(JsonValue& out, JsonParseError& err) {
+    const std::size_t start = pos_;
+    // sign
     if (!atEnd() && peek() == '-')
         consume();
-    return true;
-}
-
-bool JsonParser::parseIntegerPart(JsonParseError& err) {
+    // integer part (must have at least one digit)
     if (atEnd() ||
         !std::isdigit(static_cast<unsigned char>(peek())))
         return fail(err, "invalid number");
     if (peek() == '0') {
         consume();
-        return true;
+    } else {
+        while (!atEnd() &&
+               std::isdigit(static_cast<unsigned char>(peek())))
+            consume();
     }
-    while (!atEnd() &&
-           std::isdigit(static_cast<unsigned char>(peek())))
-        consume();
-    return true;
-}
-
-bool JsonParser::parseFractionPart(JsonParseError& err) {
-    if (atEnd() || peek() != '.')
-        return true;
-    consume(); // '.'
-    if (atEnd() ||
-        !std::isdigit(static_cast<unsigned char>(peek())))
-        return fail(err, "invalid number");
-    while (!atEnd() &&
-           std::isdigit(static_cast<unsigned char>(peek())))
-        consume();
-    return true;
-}
-
-bool JsonParser::parseExponentPart(JsonParseError& err) {
-    if (atEnd() || (peek() != 'e' && peek() != 'E'))
-        return true;
-    consume(); // 'e'/'E'
-    if (!atEnd() && (peek() == '+' || peek() == '-'))
-        consume();
-    if (atEnd() ||
-        !std::isdigit(static_cast<unsigned char>(peek())))
-        return fail(err, "invalid number");
-    while (!atEnd() &&
-           std::isdigit(static_cast<unsigned char>(peek())))
-        consume();
-    return true;
-}
-
-bool JsonParser::parseNumber(JsonValue& out, JsonParseError& err) {
-    const std::size_t start = pos_;
-    // sign
-    skipNumberSign();
-    // integer part (must have at least one digit)
-    if (!parseIntegerPart(err))
-        return false;
     // fraction part (optional ".digits")
-    if (!parseFractionPart(err))
-        return false;
+    if (!atEnd() && peek() == '.') {
+        consume(); // '.'
+        if (atEnd() ||
+            !std::isdigit(static_cast<unsigned char>(peek())))
+            return fail(err, "invalid number");
+        while (!atEnd() &&
+               std::isdigit(static_cast<unsigned char>(peek())))
+            consume();
+    }
     // exponent part (optional "e[+-]digits")
-    if (!parseExponentPart(err))
-        return false;
+    if (!atEnd() && (peek() == 'e' || peek() == 'E')) {
+        consume(); // 'e'/'E'
+        if (!atEnd() && (peek() == '+' || peek() == '-'))
+            consume();
+        if (atEnd() ||
+            !std::isdigit(static_cast<unsigned char>(peek())))
+            return fail(err, "invalid number");
+        while (!atEnd() &&
+               std::isdigit(static_cast<unsigned char>(peek())))
+            consume();
+    }
     // convert
     try {
         out.numberValue =
@@ -276,12 +251,9 @@ bool JsonParser::parseHex4(JsonParseError& err, unsigned int& value) {
     for (int i = 0; i < kHexDigitsPerEscape; ++i) {
         const char c = text_[pos_++];
         value <<= kHexShift;
-        if (c >= '0' && c <= '9')
-            value += static_cast<unsigned int>(c - '0');
-        else if (c >= 'a' && c <= 'f')
-            value += static_cast<unsigned int>(kHexDigitBase + (c - 'a'));
-        else if (c >= 'A' && c <= 'F')
-            value += static_cast<unsigned int>(kHexDigitBase + (c - 'A'));
+        const int digit = hex_digit_value(c);
+        if (digit >= 0)
+            value += static_cast<unsigned int>(digit);
         else
             return fail(err, "invalid unicode escape");
     }

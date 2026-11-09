@@ -60,10 +60,6 @@ private:
     bool parseLiteral(const std::string& lit, bool boolVal, JsonValue& out,
                       JsonParseError& err);
     bool parseNumber(JsonValue& out, JsonParseError& err);
-    bool skipNumberSign();
-    bool parseIntegerPart(JsonParseError& err);
-    bool parseFractionPart(JsonParseError& err);
-    bool parseExponentPart(JsonParseError& err);
     static void appendUtf8(std::string& out, unsigned int cp);
     bool parseHex4(JsonParseError& err, unsigned int& value);
     bool parseString(std::string& out, JsonParseError& err);
