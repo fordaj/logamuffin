@@ -44,6 +44,72 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# ---------------------------------------------------------------------------
+# Shared test constants (single source so harness tweaks touch one place)
+# ---------------------------------------------------------------------------
+
+# Subprocess timeout for each binary invocation.
+SUBPROCESS_TIMEOUT_SECONDS = 15
+
+# Env vars starting with this prefix are stripped from the host so tests
+# never leak host LOG_* settings.
+LOG_ENV_PREFIX = "LOG_"
+
+# Deterministic half of color handling: plain vs ANSI.
+COLOR_PLAIN = "0"
+COLOR_ON = "1"
+
+# All documented level names (word forms only; numeric handled separately).
+DOCUMENTED_LEVELS = (
+    "ALWAYS", "TRACE", "DEBUG", "INFO", "WARN", "WARNING",
+    "ERROR", "CRITICAL", "FATAL",
+)
+STDOUT_LEVELS = ("TRACE", "DEBUG", "INFO", "WARNING")
+STDERR_LEVELS = ("ERROR", "CRITICAL", "FATAL")
+WARN_ALIASES = ("WARN", "WARNING", "warn", "warning")
+CRITICAL_ALIASES = ("FATAL", "CRITICAL", "fatal", "critical")
+
+# (threshold LOG_LEVEL, emitted LEVEL, should_keep)
+THRESHOLD_FILTER_CASES = (
+    ("DEBUG", "TRACE", False),
+    ("DEBUG", "DEBUG", True),
+    ("DEBUG", "INFO", True),
+    ("WARNING", "INFO", False),
+    ("WARNING", "WARNING", True),
+    ("CRITICAL", "ERROR", False),
+    ("CRITICAL", "CRITICAL", True),
+)
+
+# LOG_COLOR token variants (truthy → ANSI, falsy/unknown → plain).
+COLOR_TRUTHY_VALUES = ("1", "TRUE", "true", "True", "YES", "yes", "ON", "on")
+COLOR_FALSY_VALUES = (
+    "0", "FALSE", "false", "NO", "no", "OFF", "off", "bogus", "",
+)
+
+# Packaged-build platforms, in search order. Candidate paths are built
+# from this tuple so adding a platform touches one place.
+PACKAGED_PLATFORMS = (
+    "macos-arm64", "macos-x86_64",
+    "linux-arm64", "linux-x86_64",
+    "windows-x86_64", "windows-arm64",
+)
+
+
+def _build_candidates(suffix: str) -> list[Path]:
+    # Native dev build first, then release/debug per-platform, then
+    # legacy build/native, then repo-root platform dirs.
+    candidates = [REPO_ROOT / "build" / "debug" / f"logamuffin{suffix}"]
+    for mode in ("release", "debug"):
+        for platform in PACKAGED_PLATFORMS:
+            candidates.append(
+                REPO_ROOT / "build" / mode / platform / f"logamuffin{suffix}"
+            )
+    candidates.append(REPO_ROOT / "build" / f"logamuffin{suffix}")
+    candidates.append(REPO_ROOT / "build" / "native" / f"logamuffin{suffix}")
+    for platform in PACKAGED_PLATFORMS:
+        candidates.append(REPO_ROOT / platform / f"logamuffin{suffix}")
+    return candidates
+
 
 def _candidate_executable() -> Path | None:
     env_bin = os.environ.get("LOG_BIN")
@@ -53,30 +119,7 @@ def _candidate_executable() -> Path | None:
         return Path(env_bin).expanduser().resolve()
 
     suffix = ".exe" if sys.platform.startswith("win") else ""
-    candidates = [
-        REPO_ROOT / "build" / "debug" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "release" / "macos-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "release" / "macos-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "release" / "linux-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "release" / "linux-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "release" / "windows-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "release" / "windows-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "debug" / "macos-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "debug" / "macos-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "debug" / "linux-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "debug" / "linux-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "debug" / "windows-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "debug" / "windows-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / f"logamuffin{suffix}",
-        REPO_ROOT / "build" / "native" / f"logamuffin{suffix}",
-        REPO_ROOT / "macos-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "macos-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "linux-arm64" / f"logamuffin{suffix}",
-        REPO_ROOT / "linux-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "windows-x86_64" / f"logamuffin{suffix}",
-        REPO_ROOT / "windows-arm64" / f"logamuffin{suffix}",
-    ]
-    for path in candidates:
+    for path in _build_candidates(suffix):
         if path.is_file():
             return path.resolve()
 
@@ -86,11 +129,24 @@ def _candidate_executable() -> Path | None:
 
 EXE: Path | None = _candidate_executable()
 
-# Matches "<YYYY-MM-DD HH:MM:SS,mmm> <host> [<LEVEL>] <source>: <message>"
+# File line: "<YYYY-MM-DD HH:MM:SS,mmm> <host> [<LEVEL>] <source>: <message>"
 # LEVEL may be a word (TRACE) or an ad-hoc number (25, -5), so allow
 # letters, digits, '_' and '-'.
 FILE_LINE_RE = re.compile(
-    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \S+ \[[A-Z0-9_-]+\] \S+: .+$"
+    r"""
+    ^(?P<date>\d{4}-\d{2}-\d{2})          # YYYY-MM-DD
+    \s
+    (?P<time>\d{2}:\d{2}:\d{2},\d{3})    # HH:MM:SS,mmm
+    \s
+    (?P<host>\S+)
+    \s
+    \[(?P<level>[A-Z0-9_-]+)\]           # word or numeric level
+    \s
+    (?P<source>\S+):                      # source: prefix
+    \s
+    (?P<message>.+)$
+    """,
+    re.VERBOSE,
 )
 
 
@@ -111,10 +167,14 @@ class LogamuffinTestCase(unittest.TestCase):
         self.exe = str(EXE)
 
     def base_env(self, **overrides: str | None) -> dict[str, str]:
-        env = {k: v for k, v in os.environ.items() if not k.startswith("LOG_")}
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if not k.startswith(LOG_ENV_PREFIX)
+        }
         # Deterministic defaults: plain output + isolated log file.
         env["LOG_FILE"] = str(self.log_file)
-        env["LOG_COLOR"] = "0"
+        env["LOG_COLOR"] = COLOR_PLAIN
         for key, value in overrides.items():
             if value is None:
                 env.pop(key, None)
@@ -133,7 +193,7 @@ class LogamuffinTestCase(unittest.TestCase):
             [self.exe, *args],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
             env=env,
             cwd=str(cwd) if cwd is not None else None,
         )
@@ -142,6 +202,35 @@ class LogamuffinTestCase(unittest.TestCase):
         if not self.log_file.is_file():
             return ""
         return self.log_file.read_text(encoding="utf-8", errors="replace")
+
+    # ------------------------------------------------------------------
+    # Assertion helpers (arrange: env -> run -> assert in one line)
+    # ------------------------------------------------------------------
+
+    def assert_emits(
+        self,
+        result: subprocess.CompletedProcess,
+        marker: str,
+        *,
+        stream: str = "stdout",
+    ) -> None:
+        """Emitted message: exit 0, marker on the right stream and in file."""
+        self.assertEqual(
+            result.returncode, 0, f"stderr: {result.stderr!r}"
+        )
+        self.assertIn(marker, getattr(result, stream))
+        self.assertIn(marker, self.read_log())
+
+    def assert_filtered(
+        self,
+        result: subprocess.CompletedProcess,
+        marker: str,
+    ) -> None:
+        """Filtered message: exit 0, silent on both streams and in file."""
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "")
+        self.assertNotIn(marker, self.read_log())
 
 
 class TestCLIArguments(LogamuffinTestCase):
@@ -167,8 +256,12 @@ class TestCLIArguments(LogamuffinTestCase):
         result = self.run_bin(["BOGUS", "message"])
         self.assertEqual(result.returncode, 2)
         self.assertIn("Unknown log level: BOGUS", result.stderr)
-        for level in ("TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "ALWAYS"):
+        for level in DOCUMENTED_LEVELS:
+            if level in ("WARN", "FATAL"):
+                continue  # listed as WARN/WARNING, CRITICAL/FATAL
             self.assertIn(level, result.stderr)
+        self.assertIn("WARNING", result.stderr)
+        self.assertIn("CRITICAL", result.stderr)
         self.assertEqual(result.stdout, "")
 
     def test_version_with_extra_arg_is_treated_as_unknown_level(self) -> None:
@@ -193,35 +286,46 @@ class TestCLIArguments(LogamuffinTestCase):
 
 class TestSeverityAliasesAndFiltering(LogamuffinTestCase):
     def test_all_documented_levels_are_accepted(self) -> None:
-        for level in ("ALWAYS", "TRACE", "DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL", "FATAL"):
+        for level in DOCUMENTED_LEVELS:
             with self.subTest(level=level):
-                result = self.run_bin([level, f"lvl-{level}"], LOG_LEVEL="TRACE", LOG_COLOR="0")
-                self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
+                result = self.run_bin(
+                    [level, f"lvl-{level}"],
+                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN,
+                )
+                self.assertEqual(
+                    result.returncode, 0, f"stderr: {result.stderr!r}"
+                )
                 self.assertIn(f"lvl-{level}", self.read_log())
 
     def test_warn_and_warning_aliases_produce_same_label(self) -> None:
-        for alias in ("WARN", "WARNING", "warn", "warning"):
+        for alias in WARN_ALIASES:
             with self.subTest(alias=alias):
                 log = self.dir / f"warn-{alias}.log"
                 result = self.run_bin(
                     [alias, f"warn-{alias}"],
-                    LOG_LEVEL="TRACE", LOG_COLOR="0", LOG_FILE=str(log),
+                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN,
+                    LOG_FILE=str(log),
                 )
                 self.assertEqual(result.returncode, 0)
-                content = log.read_text(encoding="utf-8", errors="replace")
+                content = log.read_text(
+                    encoding="utf-8", errors="replace"
+                )
                 self.assertIn("[WARN]", content)
                 self.assertIn(f"warn-{alias}", content)
 
     def test_fatal_and_critical_aliases_produce_same_label(self) -> None:
-        for alias in ("FATAL", "CRITICAL", "fatal", "critical"):
+        for alias in CRITICAL_ALIASES:
             with self.subTest(alias=alias):
                 log = self.dir / f"crit-{alias}.log"
                 result = self.run_bin(
                     [alias, f"crit-{alias}"],
-                    LOG_LEVEL="TRACE", LOG_COLOR="0", LOG_FILE=str(log),
+                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN,
+                    LOG_FILE=str(log),
                 )
                 self.assertEqual(result.returncode, 0)
-                content = log.read_text(encoding="utf-8", errors="replace")
+                content = log.read_text(
+                    encoding="utf-8", errors="replace"
+                )
                 self.assertIn("[CRITICAL]", content)
 
     def test_default_threshold_filters_below_info(self) -> None:
@@ -238,21 +342,14 @@ class TestSeverityAliasesAndFiltering(LogamuffinTestCase):
         self.assertIn("kept-info", self.read_log())
 
     def test_log_level_override_controls_filtering(self) -> None:
-        cases = [
-            ("DEBUG", "TRACE", False),
-            ("DEBUG", "DEBUG", True),
-            ("DEBUG", "INFO", True),
-            ("WARNING", "INFO", False),
-            ("WARNING", "WARNING", True),
-            ("CRITICAL", "ERROR", False),
-            ("CRITICAL", "CRITICAL", True),
-        ]
-        for threshold, level, expected_kept in cases:
+        for threshold, level, expected_kept in THRESHOLD_FILTER_CASES:
             with self.subTest(threshold=threshold, level=level):
                 log = self.dir / f"filt-{threshold}-{level}.log"
                 result = self.run_bin(
                     [level, f"m-{threshold}-{level}"],
-                    LOG_LEVEL=threshold, LOG_COLOR="0", LOG_FILE=str(log),
+                    LOG_LEVEL=threshold,
+                    LOG_COLOR=COLOR_PLAIN,
+                    LOG_FILE=str(log),
                 )
                 self.assertEqual(result.returncode, 0)
                 content = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
@@ -342,17 +439,23 @@ class TestEnvironmentConfiguration(LogamuffinTestCase):
 
 class TestOutputStreams(LogamuffinTestCase):
     def test_info_and_lower_go_to_stdout(self) -> None:
-        for level in ("TRACE", "DEBUG", "INFO", "WARNING"):
+        for level in STDOUT_LEVELS:
             with self.subTest(level=level):
-                result = self.run_bin([level, f"s-{level}"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+                result = self.run_bin(
+                    [level, f"s-{level}"],
+                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN,
+                )
                 self.assertEqual(result.returncode, 0)
                 self.assertIn(f"s-{level}", result.stdout)
                 self.assertEqual(result.stderr, "")
 
     def test_error_and_critical_go_to_stderr(self) -> None:
-        for level in ("ERROR", "CRITICAL", "FATAL"):
+        for level in STDERR_LEVELS:
             with self.subTest(level=level):
-                result = self.run_bin([level, f"s-{level}"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+                result = self.run_bin(
+                    [level, f"s-{level}"],
+                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN,
+                )
                 self.assertEqual(result.returncode, 0)
                 self.assertIn(f"s-{level}", result.stderr)
                 self.assertEqual(result.stdout, "")
@@ -424,23 +527,23 @@ class TestFileHandling(LogamuffinTestCase):
 
 class TestColorBehavior(LogamuffinTestCase):
     def test_log_color_zero_produces_plain_output(self) -> None:
-        result = self.run_bin(["INFO", "plain-msg"], LOG_COLOR="0")
+        result = self.run_bin(["INFO", "plain-msg"], LOG_COLOR=COLOR_PLAIN)
         self.assertEqual(result.returncode, 0)
         self.assertNotIn("\033", result.stdout)
 
     def test_log_color_one_produces_ansi_output(self) -> None:
-        result = self.run_bin(["INFO", "color-msg"], LOG_COLOR="1")
+        result = self.run_bin(["INFO", "color-msg"], LOG_COLOR=COLOR_ON)
         self.assertEqual(result.returncode, 0)
         self.assertIn("\033", result.stdout)
         self.assertIn("color-msg", result.stdout)
 
     def test_log_color_truthy_and_falsy_variants(self) -> None:
-        for value in ("1", "TRUE", "true", "True", "YES", "yes", "ON", "on"):
+        for value in COLOR_TRUTHY_VALUES:
             with self.subTest(value=value, expect_ansi=True):
                 result = self.run_bin(["INFO", f"c-{value}"], LOG_COLOR=value)
                 self.assertEqual(result.returncode, 0)
                 self.assertIn("\033", result.stdout)
-        for value in ("0", "FALSE", "false", "NO", "no", "OFF", "off", "bogus", ""):
+        for value in COLOR_FALSY_VALUES:
             with self.subTest(value=value, expect_ansi=False):
                 result = self.run_bin(["INFO", f"c-{value}"], LOG_COLOR=value)
                 self.assertEqual(result.returncode, 0)
@@ -637,7 +740,7 @@ class TestLogHelper(LogamuffinTestCase):
             ["bash", str(script_path)],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
             env=env,
             cwd=str(self.dir),
         )
