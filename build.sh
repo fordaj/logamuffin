@@ -33,17 +33,16 @@ set -euo pipefail
         ;;
     esac
 
-    # Translation units (split from the former 1955-line logamuffin.cpp;
-    # see docs/TESTING.md for the module layout).
-    SOURCES=(logamuffin.cpp logamuffin_core.cpp text_utils.cpp json_parser.cpp color.cpp
-             log_levels.cpp config.cpp platform.cpp)
-
     # ============================================================
     # Setup
     # ============================================================
 
     SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR"
+
+    # Single source for TU list (see tools/sources.sh).
+    # shellcheck source=tools/sources.sh
+    source "$SCRIPT_DIR/tools/sources.sh"
 
     # All build outputs live under build/<mode>/<platform>/ so release
     # and debug binaries never collide and the repo root stays clean

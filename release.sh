@@ -31,23 +31,13 @@ set -euo pipefail
             exit 1
         fi
 
-        extract_version_component() {
-            local macro="$1"
-            local value
-
-            value="$(awk -v macro="$macro" '
-            $1 == "#define" && $2 == macro && $3 ~ /^[0-9]+$/ {
-                print $3
-                exit
-            }
-        ' "$VERSION_HEADER")"
-
-            printf '%s' "$value"
+        version_component() {
+            grep -E "^#define $1 [0-9]+$" "$VERSION_HEADER" | awk '{print $3}'
         }
 
-        VERSION_MAJOR="$(extract_version_component LOGAMUFFIN_VERSION_MAJOR)"
-        VERSION_MINOR="$(extract_version_component LOGAMUFFIN_VERSION_MINOR)"
-        VERSION_PATCH="$(extract_version_component LOGAMUFFIN_VERSION_PATCH)"
+        VERSION_MAJOR="$(version_component LOGAMUFFIN_VERSION_MAJOR)"
+        VERSION_MINOR="$(version_component LOGAMUFFIN_VERSION_MINOR)"
+        VERSION_PATCH="$(version_component LOGAMUFFIN_VERSION_PATCH)"
 
         if [[ -z "$VERSION_MAJOR" || -z "$VERSION_MINOR" || -z "$VERSION_PATCH" ]]; then
             echo "ERROR: Could not extract version components from $VERSION_HEADER" >&2
