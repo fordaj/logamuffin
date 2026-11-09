@@ -24,16 +24,13 @@ set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 resolve_logger() {
-    # Fresh native build first so the showcase always exercises the current
+    # Fresh builds first so the showcase always exercises the current
     # checkout (an installed `logamuffin` on PATH may be an older release whose
     # BOGUS/--config handling and valid-levels output differ — see issue #12).
+    # Order: native build from ./run_tests.sh, then platform build from
+    # ./build.sh, then PATH as last resort.
     if [[ -x "$SCRIPT_DIR/build/logamuffin" ]]; then
         printf '%s\n' "$SCRIPT_DIR/build/logamuffin"
-        return 0
-    fi
-
-    if command -v logamuffin >/dev/null 2>&1; then
-        command -v logamuffin
         return 0
     fi
 
@@ -59,21 +56,29 @@ resolve_logger() {
         build_dir="linux-arm64"
         ;;
     *)
-        return 1
+        build_dir=""
         ;;
     esac
 
-    local candidate="$SCRIPT_DIR/$build_dir/logamuffin"
+    if [[ -n "$build_dir" ]]; then
+        local candidate="$SCRIPT_DIR/$build_dir/logamuffin"
 
-    # Windows build output uses the .exe suffix.
-    case "$(uname -s)" in
-    MINGW* | MSYS* | CYGWIN*)
-        candidate="${candidate}.exe"
-        ;;
-    esac
+        # Windows build output uses the .exe suffix.
+        case "$(uname -s)" in
+        MINGW* | MSYS* | CYGWIN*)
+            candidate="${candidate}.exe"
+            ;;
+        esac
 
-    if [[ -x "$candidate" ]]; then
-        printf '%s\n' "$candidate"
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    fi
+
+    # Last resort: installed binary on PATH.
+    if command -v logamuffin >/dev/null 2>&1; then
+        command -v logamuffin
         return 0
     fi
 
