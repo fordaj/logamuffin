@@ -27,6 +27,10 @@ UNIT_BIN="build/tests/unit/test_logamuffin"
 NATIVE_BIN="build/logamuffin"
 EXECUTABLE=""
 
+# Translation units (split from the former 1955-line logamuffin.cpp).
+SOURCES=(logamuffin.cpp text_utils.cpp json_parser.cpp color.cpp
+         log_levels.cpp config.cpp platform.cpp)
+
 SKIP_UNIT="false"
 SKIP_INTEGRATION="false"
 CLEAN="false"
@@ -175,7 +179,7 @@ if [[ "$SKIP_INTEGRATION" != "true" ]]; then
         echo "Using provided executable: $BIN_PATH"
     else
         mkdir -p "$(dirname "$NATIVE_BIN")"
-        if "$CXX" "${CXXFLAGS[@]}" logamuffin.cpp -o "$NATIVE_BIN"; then
+        if "$CXX" "${CXXFLAGS[@]}" "${SOURCES[@]}" -o "$NATIVE_BIN"; then
             echo "Built native binary: $NATIVE_BIN"
         else
             INTEG_STATUS="BUILD FAILED"

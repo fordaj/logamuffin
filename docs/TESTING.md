@@ -99,14 +99,45 @@ core module, `logamuffin.hpp` (`namespace logamuffin`, all functions
 - `format_file_entry()` / `format_console_output()` — plain-text file
   lines and console lines (color + terminal-width branches).
 
-`logamuffin.cpp` now only owns platform/process concerns (`hostname()`,
+`logamuffin.cpp` used to own platform/process concerns (`hostname()`,
 TTY detection, terminal width, locked file append, `run()`/`main()`) and
-calls the core for everything testable. There is **no observable
+called the core for everything testable. There was **no observable
 behavior change**: same messages, exit codes, streams, and file format.
-`build.sh` needed no changes.
 
 The unit tests `#include "logamuffin.hpp"` directly, so they exercise
 the exact code the executable runs.
+
+### Modular executable (issue #8)
+
+The former 1,955-line `logamuffin.cpp` (extensible categories, colors,
+JSON/env config, platform I/O, and `run()`/`main()` in one anonymous
+namespace) is now split by responsibility into `namespace logamuffin`
+modules. Each module has a single cohesive responsibility and a minimal
+public header; helpers shared only inside a module stay file-local.
+
+- `logamuffin.cpp` — thin executable entry: help/usage text, config-aware
+  source resolution, `run()` (argument/config wiring, filtering,
+  console + file output), and `main()`.
+- `logamuffin.hpp` — testable core (pure helpers, unchanged interface).
+- `text_utils.hpp/.cpp` — string helpers (`lowercase`, `trim`,
+  `normalize_key`, `parse_int_strict`, `parse_bool_string`).
+- `json_parser.hpp/.cpp` — self-contained JSON parser (`JsonValue`,
+  `JsonParser`, location + scalar helpers). No other internal
+  dependencies.
+- `color.hpp/.cpp` — color resolution (`resolve_color()` is public;
+  name tables and escape helpers are file-local).
+- `log_levels.hpp/.cpp` — level registry (`LogLevel`, `Config`,
+  defaults, lookup/alias, validation, `upsert_level`,
+  `is_error_level`).
+- `config.hpp/.cpp` — configuration pipeline (`load_config()` is
+  public; JSON/env field application and file reading are file-local).
+- `platform.hpp/.cpp` — OS surface (`hostname()`, `terminal()`,
+  `terminal_width()`, `append_locked()`).
+
+`build.sh` and `run_tests.sh` compile the `SOURCES` list (all seven
+translation units). There is **no observable behavior change**: same
+messages, exit codes, streams, and file format. Unit tests still only
+need `logamuffin.hpp`.
 
 ### Why doctest for unit tests
 
@@ -209,7 +240,13 @@ width; assert with `assertIn` / regex instead.
 
 ```
 logamuffin.hpp                     testable core (pure helpers)
-logamuffin.cpp                     executable (platform I/O + run/main)
+logamuffin.cpp                     executable entry (run/main)
+text_utils.hpp/.cpp                string helpers
+json_parser.hpp/.cpp               JSON parser
+color.hpp/.cpp                     color resolution
+log_levels.hpp/.cpp                level registry (LogLevel/Config)
+config.hpp/.cpp                    config pipeline (load_config)
+platform.hpp/.cpp                  platform/process helpers
 run_tests.sh                       one-command entry point
 tests/unit/test_logamuffin.cpp     doctest unit tests
 tests/integration/test_cli.py      Python stdlib CLI tests
