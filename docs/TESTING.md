@@ -212,12 +212,12 @@ table, message joining, file and console formatting (including the
 - Concurrency: 10 parallel writers → all 10 lines in the file.
 - Exit codes: `0` success/filtered/version, `2` usage/level/env errors.
 
-The legacy Bash suite `test.sh` is **preserved unchanged** as a quick
-POSIX smoke check. The Python suite supersedes it — it covers
-everything `test.sh` did (version, usage, invalid severity, all
-severities, `INFO` filtering, `ALWAYS`, invalid `LOG_LEVEL`, stream
-routing, multiline) plus the missing cases above. `run_tests.sh`
-uses the Python suite.
+The legacy Bash suite `test.sh` is **deprecated**: it is now a thin
+shim forwarding to `run_tests.sh --skip-unit`. The Python suite
+supersedes it — it covers everything `test.sh` did (version, usage,
+invalid severity, all severities, `INFO` filtering, `ALWAYS`,
+invalid `LOG_LEVEL`, stream routing, multiline) plus the missing
+cases above. `run_tests.sh` uses the Python suite.
 
 ## CI
 
@@ -266,7 +266,7 @@ run_tests.sh                       one-command entry point
 tests/unit/test_logamuffin.cpp     doctest unit tests
 tests/integration/test_cli.py      Python stdlib CLI tests
 tools/doctest/v2.5.3/doctest.h     vendored doctest
-test.sh                            legacy POSIX smoke test (preserved)
+test.sh                            deprecated shim -> run_tests.sh
 log.sh                             Bash `log` helper (source for `log`)
 docs/TESTING.md                    this file
 build/                             ignored outputs: build/debug/,
