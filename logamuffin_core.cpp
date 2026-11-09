@@ -14,44 +14,19 @@ namespace logamuffin {
 namespace {
 
 // Timestamp: "YYYY-MM-DD HH:MM:SS,mmm" (27 chars + null).
-constexpr std::size_t kTimestampBufferSize = 32;
-constexpr std::size_t kFullTimestampBufferSize = 40;
+constexpr std::size_t kTimestampBufferSize = 40;
 constexpr long long kMillisPerSecond = 1000;
 constexpr const char* kTimestampFormat = "%Y-%m-%d %H:%M:%S";
 
 // Index of INFO in kBuiltinLevels for info() fallback.
 constexpr std::size_t kInfoFallbackIndex = 3;
 
-struct LevelNameEntry {
-    std::string_view name;
-    Level level;
-};
-
-// Name → Level table (canonical names + numeric forms). Aliases
-// (WARNING→WARN, FATAL→CRITICAL) are single-sourced in log_levels.hpp
-// (kLevelAliases) and resolved via level_alias_target() below.
-// Adding a level is a one-line data addition; lookup is linear scan.
-constexpr std::array<LevelNameEntry, 14> kLevelNameTable = {{
-    {"TRACE", Level::Trace},
-    {"DEBUG", Level::Debug},
-    {"INFO", Level::Info},
-    {"WARN", Level::Warning},
-    {"ERROR", Level::Error},
-    {"CRITICAL", Level::Critical},
-    {"ALWAYS", Level::Always},
-    {"-1", Level::Always},
-    {"5", Level::Trace},
-    {"10", Level::Debug},
-    {"20", Level::Info},
-    {"30", Level::Warning},
-    {"40", Level::Error},
-    {"50", Level::Critical},
-    // Note: numeric forms map to built-ins only. Custom numeric levels
-    // are handled by resolve_level() in logamuffin.cpp via Config.
-}};
-
+// Name/numeric → Level derived from the single kBuiltinLevels table in
+// logamuffin.hpp. Aliases (WARNING→WARN, FATAL→CRITICAL) are single-sourced
+// in log_levels.hpp (kLevelAliases). Numeric forms map to built-ins only;
+// custom numeric levels are handled by resolve_level() in logamuffin.cpp.
 bool lookup_level_name(std::string_view upperValue, Level& out) {
-    for (const auto& entry : kLevelNameTable) {
+    for (const auto& entry : kBuiltinLevels) {
         if (upperValue == entry.name) {
             out = entry.level;
             return true;
@@ -60,8 +35,20 @@ bool lookup_level_name(std::string_view upperValue, Level& out) {
     // Aliases consult the single-source table in log_levels.hpp.
     if (const auto canonical = level_alias_target(upperValue);
         !canonical.empty()) {
-        for (const auto& entry : kLevelNameTable) {
+        for (const auto& entry : kBuiltinLevels) {
             if (canonical == entry.name) {
+                out = entry.level;
+                return true;
+            }
+        }
+    }
+    // Numeric built-in values (-1, 5, 10, 20, 30, 40, 50). Guard against
+    // surrounding whitespace so " 5 " is rejected like the old table.
+    int numeric = 0;
+    if (trim(std::string(upperValue)) == upperValue &&
+        parse_int_strict(std::string(upperValue), numeric)) {
+        for (const auto& entry : kBuiltinLevels) {
+            if (numeric == static_cast<int>(entry.level)) {
                 out = entry.level;
                 return true;
             }
@@ -125,7 +112,7 @@ std::string timestamp() {
     char buffer[kTimestampBufferSize]{};
     std::strftime(buffer, sizeof(buffer), kTimestampFormat, &tm);
 
-    char result[kFullTimestampBufferSize]{};
+    char result[kTimestampBufferSize]{};
     std::snprintf(result, sizeof(result), "%s,%03lld",
                   buffer, static_cast<long long>(millis));
 
