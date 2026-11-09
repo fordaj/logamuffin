@@ -35,7 +35,7 @@ set -euo pipefail
 
     # Translation units (split from the former 1955-line logamuffin.cpp;
     # see docs/TESTING.md for the module layout).
-    SOURCES=(logamuffin.cpp text_utils.cpp json_parser.cpp color.cpp
+    SOURCES=(logamuffin.cpp logamuffin_core.cpp text_utils.cpp json_parser.cpp color.cpp
              log_levels.cpp config.cpp platform.cpp)
 
     # ============================================================

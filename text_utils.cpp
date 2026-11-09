@@ -65,11 +65,11 @@ bool parse_int_strict(const std::string& raw, int& out) {
 
 bool parse_bool_string(const std::string& raw, bool& out) {
     const std::string v = uppercase(trim(raw));
-    if (v == "1" || v == "TRUE" || v == "YES" || v == "ON") {
+    if (is_truthy_token(v)) {
         out = true;
         return true;
     }
-    if (v == "0" || v == "FALSE" || v == "NO" || v == "OFF") {
+    if (is_falsy_token(v)) {
         out = false;
         return true;
     }
