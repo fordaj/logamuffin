@@ -6,9 +6,11 @@
 // of LogLevels plus threshold/scalar settings. Config file and env
 // application live in config.cpp; this module only manages the registry.
 
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace logamuffin {
@@ -19,6 +21,23 @@ inline constexpr std::size_t kMaxLevelNameLength = 64;
 // Values at or above this go to stderr (ERROR/CRITICAL and custom high
 // categories). Mirrors the documented stream routing.
 inline constexpr int kErrorLevelValueThreshold = 40;
+
+// Canonical severity aliases (bidirectional, single source of truth).
+// "WARNING" aliases "WARN"; "FATAL" aliases "CRITICAL". Lookup,
+// valid-levels listing, and parse_level() all consult this table.
+struct LevelAlias {
+    std::string_view alias;
+    std::string_view canonical;
+};
+
+inline constexpr std::array<LevelAlias, 2> kLevelAliases = {{
+    {"WARNING", "WARN"},
+    {"FATAL", "CRITICAL"},
+}};
+
+// Returns the alias partner for upperName (canonical if upperName is an
+// alias, alias if upperName is canonical, empty otherwise).
+std::string_view level_alias_target(std::string_view upperName);
 
 struct LogLevel {
     std::string name;   // canonical uppercase name
@@ -40,8 +59,13 @@ void sort_levels(std::vector<LogLevel>& levels);
 bool valid_level_name(const std::string& upperName);
 const LogLevel* find_level_exact(const std::vector<LogLevel>& levels,
                                 const std::string& upperName);
-LogLevel* find_level_mutable(std::vector<LogLevel>& levels,
-                            const std::string& upperName);
+LogLevel* find_level_by_name_mut(std::vector<LogLevel>& levels,
+                                 const std::string& upperName);
+// Back-compat alias (renamed for naming consistency).
+inline LogLevel* find_level_mutable(std::vector<LogLevel>& levels,
+                                    const std::string& upperName) {
+    return find_level_by_name_mut(levels, upperName);
+}
 const LogLevel* find_level_with_alias(
     const std::vector<LogLevel>& levels,
     const std::string& upperName);
