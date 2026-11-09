@@ -15,17 +15,33 @@
 #include "version.hpp"
 
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace logamuffin;
 
 namespace {
 
-// RAII helper: save/restore an environment variable around a test.
-// Use with SUBCASE so each case starts clean.
+// Shared fixtures for formatting tests (independent literals, not
+// production constants, so tests verify actual documented shape).
+constexpr const char* kExampleTimestamp = "2026-11-08 14:59:00,123";
+constexpr const char* kExampleHost = "testpc";
+constexpr const char* kExampleSource = "app.sh";
+constexpr const char* kExampleMessage = "hello";
+
+// Tiny assertion helper: true when needle appears in haystack.
+inline bool contains_text(const std::string& haystack,
+                          std::string_view needle) {
+    return haystack.find(needle) != std::string::npos;
+}
+
+// Env fixture: RAII save/restore for one environment variable.
+// Construct at the top of an env test (or SUBCASE) so each case starts
+// clean and the host environment is restored on scope exit.
 struct EnvGuard {
     const char* name;
     std::string saved;
@@ -49,7 +65,17 @@ struct EnvGuard {
     void unset() { unsetenv(name); }
 };
 
+struct LevelParseCase {
+    std::string_view input;
+    Level expected;
+};
+
 } // namespace
+
+// ---------------------------------------------------------------------------
+// String helpers
+
+// ---------------------------------------------------------------------------
 
 TEST_CASE("uppercase converts ASCII to upper case") {
     CHECK(uppercase("hello") == "HELLO");
@@ -84,73 +110,82 @@ TEST_CASE("basename extracts final path component") {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Parse
+
+// ---------------------------------------------------------------------------
+
 TEST_CASE("parse_level accepts canonical names and aliases case-insensitively") {
     Level out{};
 
-    CHECK(parse_level("TRACE", out));
-    CHECK(out == Level::Trace);
-    CHECK(parse_level("DEBUG", out));
-    CHECK(out == Level::Debug);
-    CHECK(parse_level("INFO", out));
-    CHECK(out == Level::Info);
-    CHECK(parse_level("WARNING", out));
-    CHECK(out == Level::Warning);
-    CHECK(parse_level("WARN", out));
-    CHECK(out == Level::Warning);
-    CHECK(parse_level("ERROR", out));
-    CHECK(out == Level::Error);
-    CHECK(parse_level("CRITICAL", out));
-    CHECK(out == Level::Critical);
-    CHECK(parse_level("FATAL", out));
-    CHECK(out == Level::Critical);
-    CHECK(parse_level("ALWAYS", out));
-    CHECK(out == Level::Always);
+    // Canonical names + documented aliases (table-driven).
+    const LevelParseCase canonicalCases[] = {
+        {"TRACE", Level::Trace},
+        {"DEBUG", Level::Debug},
+        {"INFO", Level::Info},
+        {"WARNING", Level::Warning},
+        {"WARN", Level::Warning},
+        {"ERROR", Level::Error},
+        {"CRITICAL", Level::Critical},
+        {"FATAL", Level::Critical},
+        {"ALWAYS", Level::Always},
+    };
+    for (const auto& testCase : canonicalCases) {
+        out = Level::Info; // sentinel before each lookup
+        CHECK_MESSAGE(parse_level(std::string(testCase.input), out),
+                      "input=", testCase.input);
+        CHECK_MESSAGE(out == testCase.expected,
+                      "input=", testCase.input);
+    }
 
     SUBCASE("case-insensitive") {
-        CHECK(parse_level("trace", out));
-        CHECK(out == Level::Trace);
-        CHECK(parse_level("Info", out));
-        CHECK(out == Level::Info);
-        CHECK(parse_level("wArNiNg", out));
-        CHECK(out == Level::Warning);
-        CHECK(parse_level("warn", out));
-        CHECK(out == Level::Warning);
-        CHECK(parse_level("critical", out));
-        CHECK(out == Level::Critical);
-        CHECK(parse_level("fatal", out));
-        CHECK(out == Level::Critical);
-        CHECK(parse_level("always", out));
-        CHECK(out == Level::Always);
+        const LevelParseCase insensitiveCases[] = {
+            {"trace", Level::Trace},
+            {"Info", Level::Info},
+            {"wArNiNg", Level::Warning},
+            {"warn", Level::Warning},
+            {"critical", Level::Critical},
+            {"fatal", Level::Critical},
+            {"always", Level::Always},
+        };
+        for (const auto& testCase : insensitiveCases) {
+            out = Level::Info;
+            CHECK_MESSAGE(parse_level(std::string(testCase.input), out),
+                          "input=", testCase.input);
+            CHECK_MESSAGE(out == testCase.expected,
+                          "input=", testCase.input);
+        }
     }
 
     SUBCASE("numeric built-in values") {
-        CHECK(parse_level("-1", out));
-        CHECK(out == Level::Always);
-        CHECK(parse_level("5", out));
-        CHECK(out == Level::Trace);
-        CHECK(parse_level("10", out));
-        CHECK(out == Level::Debug);
-        CHECK(parse_level("20", out));
-        CHECK(out == Level::Info);
-        CHECK(parse_level("30", out));
-        CHECK(out == Level::Warning);
-        CHECK(parse_level("40", out));
-        CHECK(out == Level::Error);
-        CHECK(parse_level("50", out));
-        CHECK(out == Level::Critical);
+        const LevelParseCase numericCases[] = {
+            {"-1", Level::Always},
+            {"5", Level::Trace},
+            {"10", Level::Debug},
+            {"20", Level::Info},
+            {"30", Level::Warning},
+            {"40", Level::Error},
+            {"50", Level::Critical},
+        };
+        for (const auto& testCase : numericCases) {
+            out = Level::Info;
+            CHECK_MESSAGE(parse_level(std::string(testCase.input), out),
+                          "input=", testCase.input);
+            CHECK_MESSAGE(out == testCase.expected,
+                          "input=", testCase.input);
+        }
     }
 }
 
 TEST_CASE("parse_level rejects invalid values") {
     Level out = Level::Info; // sentinel: must remain untouched on failure
-    CHECK_FALSE(parse_level("", out));
-    CHECK(out == Level::Info);
-    CHECK_FALSE(parse_level("BOGUS", out));
-    CHECK_FALSE(parse_level("123", out));
-    CHECK_FALSE(parse_level("WARNI", out));
-    CHECK_FALSE(parse_level("INFORMATION", out));
-    CHECK_FALSE(parse_level(" INFO", out));
-    CHECK_FALSE(parse_level("INFO ", out));
+    const char* const invalid[] = {"", "BOGUS", "123", "WARNI",
+                                   "INFORMATION", " INFO", "INFO "};
+    for (const char* input : invalid) {
+        out = Level::Info;
+        CHECK_MESSAGE(!parse_level(input, out), "input=", input);
+        CHECK_MESSAGE(out == Level::Info, "input=", input);
+    }
 }
 
 TEST_CASE("level numeric values match documented ordering") {
@@ -194,6 +229,11 @@ TEST_CASE("clean_message strips carriage returns but keeps line breaks") {
     CHECK(clean_message("\r\r") == "");
     CHECK(clean_message("line1\r\nline2\r\n") == "line1\nline2\n");
 }
+
+// ---------------------------------------------------------------------------
+// Env + filtering
+
+// ---------------------------------------------------------------------------
 
 TEST_CASE("env_enabled interprets truthy values case-insensitively") {
     EnvGuard guard("LOG_COLOR_TEST");
@@ -275,6 +315,11 @@ TEST_CASE("should_emit implements severity filtering") {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Format
+
+// ---------------------------------------------------------------------------
+
 TEST_CASE("join_message joins parts with single spaces") {
     CHECK(join_message(std::vector<std::string>{}) == "");
     CHECK(join_message(std::vector<std::string>{"hello"}) == "hello");
@@ -296,93 +341,123 @@ TEST_CASE("join_message from argv strips carriage returns") {
 
 TEST_CASE("format_file_entry produces plain-text log lines") {
     const std::string entry = format_file_entry(
-        "2026-11-08 14:59:00,123", "testpc", Level::Info, "app.sh", "hello");
+        kExampleTimestamp, kExampleHost, Level::Info,
+        kExampleSource, kExampleMessage);
 
-    CHECK(entry == "2026-11-08 14:59:00,123 testpc [INFO] app.sh: hello\n");
+    CHECK(entry ==
+          "2026-11-08 14:59:00,123 testpc [INFO] app.sh: hello\n");
     CHECK(entry.find('\033') == std::string::npos);
     CHECK(entry.back() == '\n');
 
     // Canonical labels: Warning displays as WARN, FATAL maps to CRITICAL.
-    CHECK(format_file_entry("T", "PC", Level::Warning, "S", "M").find("[WARN]") != std::string::npos);
-    CHECK(format_file_entry("T", "PC", Level::Critical, "S", "M").find("[CRITICAL]") != std::string::npos);
+    CHECK(contains_text(format_file_entry("T", "PC", Level::Warning, "S", "M"),
+                        "[WARN]"));
+    CHECK(contains_text(format_file_entry("T", "PC", Level::Critical, "S", "M"),
+                        "[CRITICAL]"));
 
     // Multiline messages are preserved verbatim (minus \r via clean_message upstream).
     const std::string multi = format_file_entry("T", "PC", Level::Error, "S", "first\nsecond");
-    CHECK(multi.find("first\nsecond") != std::string::npos);
+    CHECK(contains_text(multi, "first\nsecond"));
     CHECK(multi.find('\033') == std::string::npos);
 }
 
 TEST_CASE("format_console_output plain branches depend on width") {
     const std::string full = format_console_output(
-        "2026-11-08 14:59:00,123", "testpc", Level::Info, "app.sh", "hello", false, 180);
-    CHECK(full.find("2026-11-08 14:59:00,123") != std::string::npos);
-    CHECK(full.find("testpc") != std::string::npos);
-    CHECK(full.find("app.sh") != std::string::npos);
-    CHECK(full.find("[INFO]") != std::string::npos);
-    CHECK(full.find("hello") != std::string::npos);
+        kExampleTimestamp, kExampleHost, Level::Info,
+        kExampleSource, kExampleMessage, false, 180);
+    CHECK(contains_text(full, kExampleTimestamp));
+    CHECK(contains_text(full, kExampleHost));
+    CHECK(contains_text(full, kExampleSource));
+    CHECK(contains_text(full, "[INFO]"));
+    CHECK(contains_text(full, kExampleMessage));
     CHECK(full.find('\033') == std::string::npos);
     CHECK(full.back() == '\n');
 
     const std::string medium = format_console_output(
-        "2026-11-08 14:59:00,123", "testpc", Level::Info, "app.sh", "hello", false, 120);
-    CHECK(medium.find("app.sh") != std::string::npos);
-    CHECK(medium.find("[INFO]") != std::string::npos);
-    CHECK(medium.find("2026-11-08") == std::string::npos);
-    CHECK(medium.find("testpc") == std::string::npos);
+        kExampleTimestamp, kExampleHost, Level::Info,
+        kExampleSource, kExampleMessage, false, 120);
+    CHECK(contains_text(medium, kExampleSource));
+    CHECK(contains_text(medium, "[INFO]"));
+    CHECK(!contains_text(medium, "2026-11-08"));
+    CHECK(!contains_text(medium, kExampleHost));
 
     const std::string narrow = format_console_output(
-        "2026-11-08 14:59:00,123", "testpc", Level::Info, "app.sh", "hello", false, 80);
-    CHECK(narrow.find("[INFO]") != std::string::npos);
-    CHECK(narrow.find("hello") != std::string::npos);
-    CHECK(narrow.find("app.sh") == std::string::npos);
-    CHECK(narrow.find("2026-11-08") == std::string::npos);
+        kExampleTimestamp, kExampleHost, Level::Info,
+        kExampleSource, kExampleMessage, false, 80);
+    CHECK(contains_text(narrow, "[INFO]"));
+    CHECK(contains_text(narrow, kExampleMessage));
+    CHECK(!contains_text(narrow, kExampleSource));
+    CHECK(!contains_text(narrow, "2026-11-08"));
 }
 
 TEST_CASE("format_console_output width thresholds are inclusive") {
     // 179 -> medium, 180 -> full, 119 -> narrow, 120 -> medium.
     const std::string at179 = format_console_output("T180", "PC180", Level::Info, "S180", "m", false, 179);
-    CHECK(at179.find("T180") == std::string::npos);
-    CHECK(at179.find("S180") != std::string::npos);
+    CHECK(!contains_text(at179, "T180"));
+    CHECK(contains_text(at179, "S180"));
 
     const std::string at180 = format_console_output("T180", "PC180", Level::Info, "S180", "m", false, 180);
-    CHECK(at180.find("T180") != std::string::npos);
+    CHECK(contains_text(at180, "T180"));
 
     const std::string at119 = format_console_output("T119", "PC119", Level::Info, "S119", "m", false, 119);
-    CHECK(at119.find("S119") == std::string::npos);
+    CHECK(!contains_text(at119, "S119"));
 
     const std::string at120 = format_console_output("T120", "PC120", Level::Info, "S120", "m", false, 120);
-    CHECK(at120.find("S120") != std::string::npos);
+    CHECK(contains_text(at120, "S120"));
 }
 
 TEST_CASE("format_console_output colored output contains ANSI codes") {
     const std::string full = format_console_output(
-        "2026-11-08 14:59:00,123", "testpc", Level::Warning, "app.sh", "hello", true, 180);
+        kExampleTimestamp, kExampleHost, Level::Warning,
+        kExampleSource, kExampleMessage, true, 180);
     CHECK(full.find('\033') != std::string::npos);
-    CHECK(full.find("[WARN]") != std::string::npos);
-    CHECK(full.find("hello") != std::string::npos);
-    CHECK(full.find(std::string(ANSI_RESET)) != std::string::npos);
+    CHECK(contains_text(full, "[WARN]"));
+    CHECK(contains_text(full, kExampleMessage));
+    CHECK(contains_text(full, std::string(ANSI_RESET)));
     CHECK(full.back() == '\n');
 
     const std::string narrow = format_console_output("T", "PC", Level::Error, "S", "msg", true, 80);
     CHECK(narrow.find('\033') != std::string::npos);
-    CHECK(narrow.find("[ERROR]") != std::string::npos);
-    CHECK(narrow.find("msg") != std::string::npos);
+    CHECK(contains_text(narrow, "[ERROR]"));
+    CHECK(contains_text(narrow, "msg"));
 }
+
+// ---------------------------------------------------------------------------
+// Time
+
+// ---------------------------------------------------------------------------
 
 TEST_CASE("timestamp uses YYYY-MM-DD HH:MM:SS,mmm format") {
     const std::string ts = timestamp();
+    // Shape: "YYYY-MM-DD HH:MM:SS,mmm" (23 chars). Parse with sscanf
+    // so failures name the field instead of a digit index.
     REQUIRE(ts.size() == 23);
+    int year = 0, month = 0, day = 0;
+    int hour = 0, minute = 0, second = 0, millis = 0;
+    const int matched = std::sscanf(
+        ts.c_str(), "%4d-%2d-%2d %2d:%2d:%2d,%3d",
+        &year, &month, &day, &hour, &minute, &second, &millis);
+    CHECK_MESSAGE(matched == 7, "timestamp=", ts);
+    CHECK_MESSAGE(year >= 1970, "year=", year);
+    CHECK_MESSAGE(year <= 9999, "year=", year);
+    CHECK_MESSAGE(month >= 1, "month=", month);
+    CHECK_MESSAGE(month <= 12, "month=", month);
+    CHECK_MESSAGE(day >= 1, "day=", day);
+    CHECK_MESSAGE(day <= 31, "day=", day);
+    CHECK_MESSAGE(hour >= 0, "hour=", hour);
+    CHECK_MESSAGE(hour <= 23, "hour=", hour);
+    CHECK_MESSAGE(minute >= 0, "minute=", minute);
+    CHECK_MESSAGE(minute <= 59, "minute=", minute);
+    CHECK_MESSAGE(second >= 0, "second=", second);
+    CHECK_MESSAGE(second <= 60, "second=", second);
+    CHECK_MESSAGE(millis >= 0, "millis=", millis);
+    CHECK_MESSAGE(millis <= 999, "millis=", millis);
     CHECK(ts[4] == '-');
     CHECK(ts[7] == '-');
     CHECK(ts[10] == ' ');
     CHECK(ts[13] == ':');
     CHECK(ts[16] == ':');
     CHECK(ts[19] == ',');
-    for (std::size_t i = 0; i < ts.size(); ++i) {
-        if (i == 4 || i == 7 || i == 10 || i == 13 || i == 16 || i == 19)
-            continue;
-        CHECK_MESSAGE(std::isdigit(static_cast<unsigned char>(ts[i])), "index=", i);
-    }
 }
 
 TEST_CASE("ANSI constants and version macro are defined") {
