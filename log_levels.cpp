@@ -64,20 +64,39 @@ std::string_view level_alias_target(std::string_view upperName) {
     return {};
 }
 
-const LogLevel* find_level_exact(const std::vector<LogLevel>& levels,
-                                 const std::string& upperName) {
+namespace {
+
+// Single linear scan; every public lookup is a predicate over it.
+template <typename Pred>
+const LogLevel* find_level_if(const std::vector<LogLevel>& levels, Pred pred) {
     for (const auto& entry : levels)
-        if (entry.name == upperName)
+        if (pred(entry))
             return &entry;
     return nullptr;
 }
 
-LogLevel* find_level_by_name_mut(std::vector<LogLevel>& levels,
-                                 const std::string& upperName) {
+template <typename Pred>
+LogLevel* find_level_if(std::vector<LogLevel>& levels, Pred pred) {
     for (auto& entry : levels)
-        if (entry.name == upperName)
+        if (pred(entry))
             return &entry;
     return nullptr;
+}
+
+} // namespace
+
+const LogLevel* find_level_exact(const std::vector<LogLevel>& levels,
+                                 const std::string& upperName) {
+    return find_level_if(levels, [&](const LogLevel& e) {
+        return e.name == upperName;
+    });
+}
+
+LogLevel* find_level_by_name_mut(std::vector<LogLevel>& levels,
+                                 const std::string& upperName) {
+    return find_level_if(levels, [&](LogLevel& e) {
+        return e.name == upperName;
+    });
 }
 
 const LogLevel* find_level_with_alias(const std::vector<LogLevel>& levels,
@@ -95,12 +114,9 @@ const LogLevel* find_level_by_value(const std::vector<LogLevel>& levels,
                                     int value) {
     // Levels are sorted by (value, name), so the first exact value match is
     // the canonical category for that number when duplicates exist.
-    for (const auto& entry : levels) {
-        if (entry.value == value) {
-            return &entry;
-        }
-    }
-    return nullptr;
+    return find_level_if(levels, [&](const LogLevel& e) {
+        return e.value == value;
+    });
 }
 
 LogLevel ad_hoc_numeric_level(int value) {
@@ -113,29 +129,26 @@ LogLevel ad_hoc_numeric_level(int value) {
     return entry;
 }
 
-// ---------------------------------------------------------------------------
 // upsert_level modes: existing update (value and/or color) vs new insert.
-// ---------------------------------------------------------------------------
-
-namespace {
-
-void apply_value_update(LogLevel* existing,
-                        const std::optional<int>& value) {
-    if (value.has_value())
-        existing->value = *value;
-}
-
-void apply_color_update(LogLevel* existing,
-                        const std::optional<std::string>& colorEscape) {
-    if (colorEscape.has_value())
-        existing->color = *colorEscape;
-}
-
-bool insert_new_level(std::vector<LogLevel>& levels,
-                      const std::string& upperName,
-                      const std::optional<int>& value,
-                      const std::optional<std::string>& colorEscape,
-                      std::string& err) {
+bool upsert_level(std::vector<LogLevel>& levels,
+                  const std::string& upperName,
+                  std::optional<int> value,
+                  std::optional<std::string> colorEscape,
+                  std::string& err) {
+    if (!valid_level_name(upperName)) {
+        err = "invalid log level name '" + upperName +
+              "' (use letters, digits, '_' or '-')";
+        return false;
+    }
+    // Existing level: apply only the fields the caller supplied.
+    if (LogLevel* existing = find_level_by_name_mut(levels, upperName)) {
+        if (value.has_value())
+            existing->value = *value;
+        if (colorEscape.has_value())
+            existing->color = *colorEscape;
+        return true;
+    }
+    // New level: requires a numeric value; color defaults to reset.
     if (!value.has_value()) {
         err = "log level '" + upperName +
               "' has no numeric value (add one, e.g. " +
@@ -149,28 +162,6 @@ bool insert_new_level(std::vector<LogLevel>& levels,
     entry.value = *value;
     levels.push_back(std::move(entry));
     return true;
-}
-
-} // namespace
-
-bool upsert_level(std::vector<LogLevel>& levels,
-                  const std::string& upperName,
-                  std::optional<int> value,
-                  std::optional<std::string> colorEscape,
-                  std::string& err) {
-    if (!valid_level_name(upperName)) {
-        err = "invalid log level name '" + upperName +
-              "' (use letters, digits, '_' or '-')";
-        return false;
-    }
-    // Existing level: apply only the fields the caller supplied.
-    if (LogLevel* existing = find_level_by_name_mut(levels, upperName)) {
-        apply_value_update(existing, value);
-        apply_color_update(existing, colorEscape);
-        return true;
-    }
-    // New level: requires a numeric value; color defaults to reset.
-    return insert_new_level(levels, upperName, value, colorEscape, err);
 }
 
 bool is_error_level(const LogLevel& level) {
