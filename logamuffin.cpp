@@ -86,6 +86,8 @@ std::string get_source(const Config& cfg, const char* argv0) {
 }
 
 void print_usage(std::ostream& out, const Config& cfg) {
+    // Usage shares the levels line with help via valid_levels_string();
+    // keep option text in lockstep with kHelpText (edit both when adding options).
     out << "Usage: logamuffin [--config <path>] LEVEL MESSAGE "
            "[MESSAGE ...]\n"
         << "LEVEL is a level name (e.g. TRACE) or a numeric value "
@@ -106,22 +108,14 @@ void print_help(std::ostream& out) {
     out << kHelpText;
 }
 
-// ---------------------------------------------------------------------------
-// --config helpers (single spelling for both positions)
-// ---------------------------------------------------------------------------
-
-bool is_config_flag(std::string_view arg) {
-    return arg == "--config";
-}
-
-bool is_config_equals_flag(std::string_view arg) {
-    return arg.starts_with(kConfigEqualsPrefix);
-}
-
-// Extracts the path after "--config=". Caller must have checked
-// is_config_equals_flag(arg); empty result means missing path.
-std::string take_config_equals(std::string_view arg) {
-    return std::string(arg.substr(kConfigEqualsLen));
+// Single spelling for both --config positions: returns path when arg is
+// --config/--config=<path>, nullopt when not a config flag, "" when missing.
+std::optional<std::string> config_flag_path(std::string_view arg) {
+    if (arg == "--config")
+        return std::string{};
+    if (arg.starts_with(kConfigEqualsPrefix))
+        return std::string(arg.substr(kConfigEqualsLen));
+    return std::nullopt;
 }
 
 void report_config_missing_path() {
@@ -169,24 +163,24 @@ bool parse_cli_args(int argc, char* argv[], ParsedArgs& out, int& exitCode) {
             wantHelp = true;
             continue;
         }
-        if (is_config_flag(arg)) {
-            if (idx + 1 >= argc) {
-                report_config_missing_path();
-                exitCode = 2;
-                return false;
+        if (const auto cfgPath = config_flag_path(arg);
+            cfgPath.has_value()) {
+            if (arg == "--config") {
+                if (idx + 1 >= argc) {
+                    report_config_missing_path();
+                    exitCode = 2;
+                    return false;
+                }
+                out.cliConfigPath = argv[idx + 1];
+                ++idx; // consumed path
+            } else {
+                if (cfgPath->empty()) {
+                    report_config_missing_path();
+                    exitCode = 2;
+                    return false;
+                }
+                out.cliConfigPath = *cfgPath;
             }
-            out.cliConfigPath = argv[idx + 1];
-            ++idx; // consumed path
-            continue;
-        }
-        if (is_config_equals_flag(arg)) {
-            const std::string configPath = take_config_equals(arg);
-            if (configPath.empty()) {
-                report_config_missing_path();
-                exitCode = 2;
-                return false;
-            }
-            out.cliConfigPath = configPath;
             continue;
         }
         {
@@ -219,23 +213,25 @@ bool parse_cli_args(int argc, char* argv[], ParsedArgs& out, int& exitCode) {
     int messageStart = 0;
     if (idx < argc && idx + 1 < argc) {
         const std::string afterLevel = argv[idx + 1];
-        if (is_config_flag(afterLevel)) {
-            if (idx + 2 >= argc) {
-                report_config_missing_path();
-                exitCode = 2;
-                return false;
+        if (const auto cfgPath = config_flag_path(afterLevel);
+            cfgPath.has_value()) {
+            if (afterLevel == "--config") {
+                if (idx + 2 >= argc) {
+                    report_config_missing_path();
+                    exitCode = 2;
+                    return false;
+                }
+                out.cliConfigPath = argv[idx + 2];
+                messageStart = idx + 3;
+            } else {
+                if (cfgPath->empty()) {
+                    report_config_missing_path();
+                    exitCode = 2;
+                    return false;
+                }
+                out.cliConfigPath = *cfgPath;
+                messageStart = idx + 2;
             }
-            out.cliConfigPath = argv[idx + 2];
-            messageStart = idx + 3;
-        } else if (is_config_equals_flag(afterLevel)) {
-            const std::string configPath = take_config_equals(afterLevel);
-            if (configPath.empty()) {
-                report_config_missing_path();
-                exitCode = 2;
-                return false;
-            }
-            out.cliConfigPath = configPath;
-            messageStart = idx + 2;
         } else {
             messageStart = idx + 1;
         }
@@ -284,53 +280,21 @@ bool resolve_level(const Config& cfg, const char* rawArg, LogLevel& outLevel) {
 }
 
 // ---------------------------------------------------------------------------
-// Message + filtering
-// ---------------------------------------------------------------------------
-
-std::string build_message(int argc, char* argv[], int messageStart) {
-    // Join all message arguments with spaces.
-    std::string message;
-    for (int i = messageStart; i < argc; ++i) {
-        if (i > messageStart)
-            message += ' ';
-        message += argv[i];
-    }
-    return clean_message(std::move(message));
-}
-
-bool should_emit_level(const Config& cfg, const LogLevel& level) {
-    // ALWAYS bypasses the threshold; everything else is at-or-above.
-    const bool isAlways = (level.name == "ALWAYS");
-    return isAlways || level.value >= cfg.thresholdValue;
-}
-
-// ---------------------------------------------------------------------------
 // Output (console + file)
 // ---------------------------------------------------------------------------
-
-// Shared timestamp/hostname/source for both console and file lines so a
-// single invocation is self-consistent.
-struct LogContext {
-    std::string time;
-    std::string host;
-    std::string source;
-};
-
-LogContext make_log_context(const Config& cfg, const char* argv0) {
-    return LogContext{timestamp(), hostname(), get_source(cfg, argv0)};
-}
 
 // Formats and writes the console line for one log invocation.
 void emit_console_line(const Config& cfg, const LogLevel& level,
                        const std::string& message,
-                       const LogContext& ctx) {
+                       const std::string& time, const std::string& host,
+                       const std::string& source) {
     FILE* stream = is_error_level(level) ? stderr : stdout;
     const bool color = cfg.colorEnabled.has_value()
         ? *cfg.colorEnabled : terminal(stream);
     const int width = terminal(stream) ? terminal_width() : kFullFormatWidth;
 
     const std::string output = format_console_output(
-        ctx.time, ctx.host, level, ctx.source, message, color, width);
+        time, host, level, source, message, color, width);
 
     std::fwrite(output.data(), 1, output.size(), stream);
     std::fflush(stream);
@@ -341,7 +305,8 @@ void emit_console_line(const Config& cfg, const LogLevel& level,
 // failure only warns (console already succeeded).
 int write_file_log(const Config& cfg, const LogLevel& level,
                    const std::string& message,
-                   const LogContext& ctx) {
+                   const std::string& time, const std::string& host,
+                   const std::string& source) {
     // Plain-text file logging, independent of console colors.
     const std::filesystem::path file =
         cfg.logFile.has_value() && !cfg.logFile->empty()
@@ -361,7 +326,7 @@ int write_file_log(const Config& cfg, const LogLevel& level,
 
     // Construct the complete entry before acquiring the lock.
     const std::string entry =
-        format_file_entry(ctx.time, ctx.host, level, ctx.source, message);
+        format_file_entry(time, host, level, source, message);
 
     if (!append_locked(file, entry)) {
         std::cerr << "logamuffin: failed to append log file\n";
@@ -396,16 +361,21 @@ int run(int argc, char* argv[]) {
         return 2;
 
     const std::string message =
-        build_message(argc, argv, args.messageStart);
+        join_message(argc, argv, args.messageStart);
 
     // Filter before doing timestamp, formatting, and file I/O.
-    if (!should_emit_level(cfg, level))
+    // ALWAYS bypasses the threshold; everything else is at-or-above.
+    if (!(level.name == "ALWAYS" || level.value >= cfg.thresholdValue))
         return 0;
 
-    const LogContext ctx = make_log_context(cfg, argv[0]);
-    emit_console_line(cfg, level, message, ctx);
+    // Shared timestamp/hostname/source for both console and file lines so
+    // a single invocation is self-consistent.
+    const std::string time = timestamp();
+    const std::string host = hostname();
+    const std::string source = get_source(cfg, argv[0]);
+    emit_console_line(cfg, level, message, time, host, source);
 
-    return write_file_log(cfg, level, message, ctx);
+    return write_file_log(cfg, level, message, time, host, source);
 }
 
 } // namespace
