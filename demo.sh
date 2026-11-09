@@ -62,32 +62,18 @@ resolve_logger() {
         ;;
     esac
 
+    # Windows build output uses the .exe suffix.
+    local suffix=""
+    case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*)
+        suffix=".exe"
+        ;;
+    esac
+
     local candidate
     for candidate in \
-        "$SCRIPT_DIR/build/release/$platform/logamuffin" \
-        "$SCRIPT_DIR/build/debug/$platform/logamuffin"; do
-        # Windows build output uses the .exe suffix.
-        case "$(uname -s)" in
-        MINGW* | MSYS* | CYGWIN*)
-            candidate="${candidate}.exe"
-            ;;
-        esac
-        if [[ -x "$candidate" ]]; then
-            printf '%s\n' "$candidate"
-            return 0
-        fi
-    done
-
-    # Legacy fallbacks (pre-build/<mode> layout): native run_tests.sh
-    # output, then repo-root platform dirs.
-    for candidate in \
-        "$SCRIPT_DIR/build/logamuffin" \
-        "$SCRIPT_DIR/$platform/logamuffin"; do
-        case "$(uname -s)" in
-        MINGW* | MSYS* | CYGWIN*)
-            candidate="${candidate}.exe"
-            ;;
-        esac
+        "$SCRIPT_DIR/build/release/$platform/logamuffin$suffix" \
+        "$SCRIPT_DIR/build/debug/$platform/logamuffin$suffix"; do
         if [[ -x "$candidate" ]]; then
             printf '%s\n' "$candidate"
             return 0
