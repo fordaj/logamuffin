@@ -44,6 +44,18 @@ set -euo pipefail
     # shellcheck source=tools/sources.sh
     source "$SCRIPT_DIR/tools/sources.sh"
 
+    # Dynamically generate .version/version.hpp from git history via
+    # the bundled fordaj/Versioner binary (see tools/generate_version.bash).
+    # Regenerated before every build so --version reflects HEAD; the
+    # .version/ directory is git-ignored. Compile with -I.version so
+    # #include "version.hpp" finds the generated header.
+    if [[ ! -x "$SCRIPT_DIR/tools/generate_version.bash" ]]; then
+        echo "ERROR: Missing tools/generate_version.bash" >&2
+        exit 1
+    fi
+    bash "$SCRIPT_DIR/tools/generate_version.bash"
+    echo
+
     # All build outputs live under build/<mode>/<platform>/ so release
     # and debug binaries never collide and the repo root stays clean
     # (issue #1). For example: build/release/macos-arm64/logamuffin,
@@ -89,6 +101,7 @@ set -euo pipefail
         if [[ -n "$target" ]]; then
             zig c++ \
                 -target "$target" \
+                -I.version \
                 "-std=$CXX_STANDARD" \
                 "${BUILD_FLAGS[@]}" \
                 "${SOURCES[@]}" \
@@ -101,6 +114,7 @@ set -euo pipefail
 
             "$compiler" \
                 "${arch_flags[@]}" \
+                -I.version \
                 "-std=$CXX_STANDARD" \
                 "${BUILD_FLAGS[@]}" \
                 "${SOURCES[@]}" \

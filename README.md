@@ -398,7 +398,9 @@ Logamuffin is written in C++20 and can be built using a native compiler and Zig 
 - A C++ compiler with C++20 support, such as Clang.
 - Zig for the configured cross-compilation targets.
 - Bash for the build and release scripts.
-- `tar`, `zip`, and a SHA-256 utility for packaging releases.
+- `7z` and a SHA-256 utility for packaging releases.
+- `git` and the bundled Versioner binary under `tools/versioner/`
+  (see [Versioning](#versioning)) for dynamic version generation.
 
 ### Build
 
@@ -407,7 +409,7 @@ Clone the repository and run the build script:
 ```bash
 git clone <repository-url>
 cd logamuffin
-chmod +x build.sh release.sh
+chmod +x build.sh release.bash
 ./build.sh
 ```
 
@@ -422,31 +424,50 @@ Outputs live under `build/<mode>/<platform>/` (for example
 `build/release/macos-arm64/logamuffin` and
 `build/debug/linux-x86_64/logamuffin`), so release and debug
 binaries never collide and the repository root stays clean.
-`release.sh` packages the `build/release/<platform>/` binaries.
+Every build first regenerates `.version/version.hpp` from git
+history via the bundled Versioner binary (see
+[Versioning](#versioning)); the `.version/` directory is
+git-ignored and compiled with `-I.version`. `release.bash`
+packages the `build/release/<platform>/` binaries.
 
 ### Create release archives
 
 Run:
 
 ```bash
-./release.sh
+./release.bash
 ```
 
-The release script builds the configured targets, packages their executables into platform-specific archives, and generates a `SHA256SUMS` file.
+The release script computes the version with the bundled Versioner
+binary, regenerates `.version/version.hpp`, builds the Zig targets
+via `./build.sh`, packs each platform into
+`Logamuffin_<tag>_<platform>.7z` (binary + `README.md` + `LICENSE`),
+writes `dist/checksums.txt`, tags `HEAD`, and publishes a GitHub
+release. Prerequisites for a real release: `zig`, `git`, `7z`,
+and `gh` authenticated via `gh auth login`; the working tree must
+be clean and `HEAD` pushed.
 
-To package existing binaries without rebuilding:
+To preview without touching anything remote:
 
 ```bash
-RUN_BUILD=false ./release.sh
+./release.bash --dry-run
 ```
 
-To override the release version:
+## Versioning
 
-```bash
-VERSION=0.1.1 ./release.sh
-```
-
-Otherwise, the release version is derived from `version.hpp`.
+Logamuffin versions come from [fordaj/Versioner](https://github.com/fordaj/Versioner),
+which derives a five-part version (`branch.major.minor.revision.patch`)
+from git history. `.versioner.json` (modeled on Versioner's default:
+`main` exempt to branch-version `0`, other branches to `254`) configures
+it. `tools/generate_version.bash` runs the bundled binary under
+`tools/versioner/` and writes `.version/version.hpp`
+(`LOGAMUFFIN_VERSION` is the five-part string, e.g. `0.1.3.0.34`;
+`LOGAMUFFIN_VERSION_TAG` adds the `v` prefix, e.g. `v0.1.3.0.34`,
+alongside the five component macros). `build.sh` and `run_tests.sh`
+regenerate the header before every build, so `logamuffin --version`
+always reflects the current `HEAD`. Refresh the bundled binaries with
+`tools/versioner/update.bash`. The generated `.version/` directory is
+git-ignored and must not be committed.
 
 ## Testing
 

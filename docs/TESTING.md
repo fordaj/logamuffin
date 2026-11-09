@@ -22,6 +22,10 @@ There is **one command** to run everything:
 - A C++ compiler with C++20 support (defaults to `clang++`, falls back to `c++`).
 - Python 3 (standard library only — no `pip install` needed).
 - Bash (the `run_tests.sh` entry point is POSIX; the integration suite itself is cross-platform).
+- `git` and the bundled Versioner binary under `tools/versioner/`
+  (`run_tests.sh` regenerates `.version/version.hpp` from git history
+  via `tools/generate_version.bash` before compiling; the `.version/`
+  directory is git-ignored).
 
 No other dependencies. The doctest header is already vendored at
 `tools/doctest/v2.5.3/doctest.h`.

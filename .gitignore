@@ -1,10 +1,12 @@
 *.logs
-linux-arm64
-linux-x86_64
-macos-x86_64
-macos-arm64
-windows-x86_64
-windows-arm64
+# Legacy root platform output dirs (anchored so tools/versioner/
+# binaries like tools/versioner/v*/macos-arm64/ stay committable).
+/linux-arm64
+/linux-x86_64
+/macos-x86_64
+/macos-arm64
+/windows-x86_64
+/windows-arm64
 dist
 *.DS_Store
 
@@ -47,6 +49,8 @@ dist
 *.exe
 *.out
 *.app
+# ... except bundled Versioner binaries (tools/versioner/update.bash).
+!tools/versioner/**/*.exe
 
 # Build directories
 build/
@@ -83,3 +87,6 @@ __pycache__/
 
 # Python tooling (uv / formattington)
 .venv/
+
+# Generated version header (fordaj/Versioner via tools/generate_version.bash)
+.version/

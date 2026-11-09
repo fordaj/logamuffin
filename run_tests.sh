@@ -139,6 +139,23 @@ if [[ -n "$EXECUTABLE" && ! -x "$EXECUTABLE" && ! -f "$EXECUTABLE" ]]; then
     exit 1
 fi
 
+# Dynamically generate .version/version.hpp from git history via the
+# bundled fordaj/Versioner binary (see tools/generate_version.bash).
+# The unit tests and the native dev binary include "version.hpp" with
+# -I.version; the directory is git-ignored, so regenerate before
+# building (same as build.sh). Skipped only when nothing is built.
+if [[ "$SKIP_UNIT" != "true" || -z "$EXECUTABLE" ]]; then
+    if [[ ! -x "tools/generate_version.bash" ]]; then
+        echo "ERROR: Missing tools/generate_version.bash" >&2
+        exit 1
+    fi
+    if ! bash "tools/generate_version.bash"; then
+        echo "ERROR: failed to generate .version/version.hpp" >&2
+        exit 1
+    fi
+    echo
+fi
+
 if [[ "$CLEAN" == "true" ]]; then
     rm -rf -- build/debug/tests build/debug/logamuffin
 fi
@@ -155,7 +172,7 @@ if [[ "$SKIP_UNIT" != "true" ]]; then
     echo " Building + running C++ unit tests"
     echo "------------------------------------------------------------"
     mkdir -p "$(dirname "$UNIT_BIN")"
-    if "$CXX" "${CXXFLAGS[@]}" -I. -Itools/doctest/v2.5.3 \
+    if "$CXX" "${CXXFLAGS[@]}" -I. -Itools/doctest/v2.5.3 -I.version \
         tests/unit/test_logamuffin.cpp "${UNIT_SOURCES[@]}" -o "$UNIT_BIN"; then
         echo "Unit binary: $UNIT_BIN"
         echo
@@ -186,7 +203,7 @@ if [[ "$SKIP_INTEGRATION" != "true" ]]; then
         echo "Using provided executable: $BIN_PATH"
     else
         mkdir -p "$(dirname "$NATIVE_BIN")"
-        if "$CXX" "${CXXFLAGS[@]}" "${SOURCES[@]}" -o "$NATIVE_BIN"; then
+        if "$CXX" "${CXXFLAGS[@]}" -I.version "${SOURCES[@]}" -o "$NATIVE_BIN"; then
             echo "Built native binary: $NATIVE_BIN"
         else
             INTEG_STATUS="BUILD FAILED"
