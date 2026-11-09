@@ -46,18 +46,34 @@ public:
     bool parse(JsonValue& out, JsonParseError& err);
 
 private:
+    enum class SeparatorResult { Continue, Done, Error };
+
     std::string text_;
     std::size_t pos_ = 0;
 
     bool fail(JsonParseError& err, const std::string& msg);
+    bool atEnd() const;
+    char peek() const;
+    char consume();
     bool skipIgnored(JsonParseError& err);
     bool parseValue(JsonValue& out, JsonParseError& err, int depth);
     bool parseLiteral(const std::string& lit, bool boolVal, JsonValue& out,
                       JsonParseError& err);
     bool parseNumber(JsonValue& out, JsonParseError& err);
+    bool skipNumberSign();
+    bool parseIntegerPart(JsonParseError& err);
+    bool parseFractionPart(JsonParseError& err);
+    bool parseExponentPart(JsonParseError& err);
     static void appendUtf8(std::string& out, unsigned int cp);
     bool parseHex4(JsonParseError& err, unsigned int& value);
     bool parseString(std::string& out, JsonParseError& err);
+    bool parseEscape(std::string& out, JsonParseError& err);
+    bool parseUnicodeEscape(std::string& out, JsonParseError& err);
+    bool parseSurrogatePair(unsigned int high, std::string& out,
+                            JsonParseError& err);
+    bool tryConsumeEmptyContainer(char closeChar);
+    SeparatorResult consumeElementSeparator(char closeChar,
+                                            JsonParseError& err);
     bool parseObject(JsonValue& out, JsonParseError& err, int depth);
     bool parseArray(JsonValue& out, JsonParseError& err, int depth);
 };
