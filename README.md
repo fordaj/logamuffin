@@ -17,6 +17,8 @@ Simple commands. Consistent output. Logs you can actually read.
 - **Standalone executable** — no Python, Node.js, or other scripting runtime required.
 - **Cross-platform** — builds for macOS, Windows, and Linux.
 - **Multiple severity levels** — filter messages by importance.
+- **Word and numeric levels** — use names (`TRACE`, `INFO`) or numbers (`50`) interchangeably.
+- **Bash `log` helper** — source `log.sh` for terse `log` calls with automatic source tracking.
 - **Extensible categories** — define custom log categories with their own numeric values and colors.
 - **Colorized terminal output** — distinguish informational messages, warnings, and errors at a glance.
 - **Persistent file logging** — append messages to a log file across invocations.
@@ -74,12 +76,14 @@ logamuffin --version
 logamuffin [--config <path>] LEVEL MESSAGE [MESSAGE ...]
 ```
 
-`LEVEL` determines the severity of the message. The remaining arguments form the message text. `--config <path>` (or `--config=<path>`) selects a JSON config file, and `--help` / `--version` print help and version information.
+`LEVEL` is a severity name (e.g. `TRACE`, `INFO`, `ERROR`) **or** a numeric value (e.g. `50`). The remaining arguments form the message text. `--config <path>` (or `--config=<path>`) selects a JSON config file, and `--help` / `--version` print help and version information.
 
 ```bash
 logamuffin INFO "Starting application"
 logamuffin WARNING "Retrying connection"
 logamuffin ERROR "Unable to connect to server"
+logamuffin 50 "A serious failure (same as CRITICAL)"
+logamuffin TRACE "Very detailed execution information"
 ```
 
 ### Severity levels
@@ -97,6 +101,8 @@ logamuffin ERROR "Unable to connect to server"
 By default, the logging threshold is `INFO`. Messages below the configured threshold are filtered out. `ALWAYS` messages bypass this filter.
 
 The defaults above are starting points, not hard-coded. You can override each category's numeric value and color — and add new categories — through environment variables or a JSON config file. For example, a custom `NOTICE` at value 25 becomes `logamuffin NOTICE "message"` once defined. Custom categories at value 40 or above, and categories named `ERROR`/`CRITICAL`/`FATAL`, write to standard error; all others write to standard output. `WARN` is an alias for `WARNING` and `FATAL` is an alias for `CRITICAL`. Thresholds may name a category (`LOG_LEVEL=NOTICE`) or be a numeric value (`LOG_LEVEL=25`); named thresholds resolve against the configured values, so redefining a category also moves thresholds that refer to it.
+
+Levels can also be given as numbers (issue #3). `logamuffin 50 "message"` resolves to the category whose value is 50 — `CRITICAL` with the defaults — and `logamuffin 25 "message"` resolves to a custom `NOTICE` when one is defined. A number that does not match any configured value is logged as an ad-hoc level with that number as its label (for example `[25]`), with the default color; it is still filtered against `LOG_LEVEL` and written to standard error when its value is 40 or above. `-1` resolves to `ALWAYS` and bypasses filtering. The Bash `log` helper documented below supports words and numbers identically.
 
 ### Examples
 
@@ -139,13 +145,79 @@ fi
 logamuffin INFO "Build completed successfully"
 ```
 
+### Bash helper: the `log` function (issue #2)
+
+Instead of invoking `logamuffin` everywhere, source `log.sh` and call `log`:
+
+```bash
+source /path/to/log.sh   # or source ./log.sh from this repo
+
+log INFO "Starting application"
+log TRACE "Very detailed execution information"
+log 50 "A serious failure"
+```
+
+`log` sets up everything so call sites stay terse: it resolves the caller's file, function, and line number and passes it to `logamuffin` as `LOG_SOURCE` (`my-script.sh:myfunc:42` → shown as `my-script.sh:myfunc:42` in the source field), forwards the `LEVEL` (a word such as `INFO` or a number such as `50`) and message exactly as given, and preserves `logamuffin`'s exit code. It does not override your `LOG_LEVEL`, `LOG_FILE`, `LOG_COLOR`, `LOG_CONFIG`, `LOG_LEVELS`, or other configuration — export them once per script and `log` respects them (with `logamuffin`'s defaults when unset), so the usual precedence (defaults → `./.logamuffin` → `LOG_CONFIG`/`--config` → environment) still works. `LOG_SOURCE` is the exception: `log` always sets it per call from the call site (call `logamuffin` directly for a fixed custom source).
+
+For a whole-script setup:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+export LOG_LEVEL=INFO     # minimum level for the script
+export LOG_FILE=".logs/my-app.log"
+source ./log.sh           # provides log(); needs logamuffin on PATH
+
+log INFO "Application started"
+log DEBUG "Loading configuration"
+```
+
+The copy-paste function (also shipped as [`log.sh`](log.sh) at the repository root — source that file to get the identical behavior):
+
+```bash
+log() {
+  local bin
+  if [[ -n "${LOGAMUFFIN_BIN:-}" ]]; then
+    bin="$LOGAMUFFIN_BIN"
+  elif command -v logamuffin >/dev/null 2>&1; then
+    bin="$(command -v logamuffin)"
+  else
+    bin="logamuffin"
+  fi
+
+  local caller_file="${BASH_SOURCE[1]:-}"
+  local caller_line="${BASH_LINENO[0]:-1}"
+  local caller_func=""
+  if (( ${#FUNCNAME[@]} > 1 )); then
+    caller_func="${FUNCNAME[1]:-}"
+  fi
+  if [[ -z "$caller_file" ]]; then
+    caller_file="${0:-log}"
+  fi
+
+  local src
+  if [[ -n "$caller_func" && "$caller_func" != "log" && "$caller_func" != "main" ]]; then
+    src="${caller_file}:${caller_func}:${caller_line}"
+  else
+    src="${caller_file}:${caller_line}"
+  fi
+
+  LOG_SOURCE="$src" "$bin" "$@"
+  return $?
+}
+```
+
+Tip: point `LOGAMUFFIN_BIN` at a build output when `logamuffin` is not on `PATH` (the demo and tests use the debug build under `build/debug/logamuffin`). The helper is Bash-only; in Zsh capture the call site with `${(%):-%N}` / `$LINENO` instead of `BASH_SOURCE`/`FUNCNAME`.
+
 ![Demo](image.png)
 
 Run `./demo.sh` to see every capability above in action in one
-visual pass (version/help, levels and colors, filtering, streams, env
-and JSON configuration and precedence, file logging, concurrent
-writes, and shell patterns). Re-run it after any change to compare
-outputs for regressions; recapture `image.png` from the new run.
+visual pass (version/help, levels and colors, numeric levels,
+filtering, streams, env and JSON configuration and precedence, file
+logging, concurrent writes, shell patterns, and the `log` helper).
+Re-run it after any change to compare outputs for regressions;
+recapture `image.png` from the new run.
 
 ## Configuration
 
@@ -346,7 +418,11 @@ BUILD_MODE=debug ./build.sh
 BUILD_MODE=release ./build.sh
 ```
 
-Build outputs are organized by platform and architecture.
+Outputs live under `build/<mode>/<platform>/` (for example
+`build/release/macos-arm64/logamuffin` and
+`build/debug/linux-x86_64/logamuffin`), so release and debug
+binaries never collide and the repository root stays clean.
+`release.sh` packages the `build/release/<platform>/` binaries.
 
 ### Create release archives
 
@@ -391,13 +467,13 @@ Useful variants:
 ```bash
 ./run_tests.sh --skip-unit          # integration only
 ./run_tests.sh --skip-integration   # unit only
-./run_tests.sh --executable ./macos-arm64/logamuffin  # test a release binary
+./run_tests.sh --executable ./build/release/macos-arm64/logamuffin  # test a release binary
 ```
 
 The CLI integration suite can also target any binary directly:
 
 ```bash
-python3 tests/integration/test_cli.py --executable build/logamuffin
+python3 tests/integration/test_cli.py --executable build/debug/logamuffin
 LOG_BIN=/path/to/logamuffin python3 tests/integration/test_cli.py
 ```
 

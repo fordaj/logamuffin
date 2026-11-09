@@ -45,6 +45,12 @@ set -euo pipefail
     SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR"
 
+    # All build outputs live under build/<mode>/<platform>/ so release
+    # and debug binaries never collide and the repo root stays clean
+    # (issue #1). For example: build/release/macos-arm64/logamuffin,
+    # build/debug/linux-x86_64/logamuffin.
+    BUILD_ROOT="build/$BUILD_MODE"
+
     echo "============================================================"
     echo " Logamuffin Build"
     echo "============================================================"
@@ -52,6 +58,7 @@ set -euo pipefail
     echo "C++:        $CXX_STANDARD"
     echo "Flags:      ${BUILD_FLAGS[*]}"
     echo "Clean:      $CLEAN_BUILD"
+    echo "Root:       $BUILD_ROOT"
     echo "============================================================"
     echo
 
@@ -66,7 +73,7 @@ set -euo pipefail
         local arch="${5:-}"
         local output="$output_dir/logamuffin"
 
-        if [[ "$output_dir" == windows-* ]]; then
+        if [[ "$output_dir" == *windows-* ]]; then
             output="${output}.exe"
         fi
 
@@ -109,22 +116,22 @@ set -euo pipefail
     # Targets
     # ============================================================
     build_target "macOS Intel x86-64" \
-        "macos-x86_64" "$NATIVE_CXX" "" "x86_64"
+        "$BUILD_ROOT/macos-x86_64" "$NATIVE_CXX" "" "x86_64"
 
     build_target "macOS Apple Silicon ARM64" \
-        "macos-arm64" "$NATIVE_CXX" "" "arm64"
+        "$BUILD_ROOT/macos-arm64" "$NATIVE_CXX" "" "arm64"
 
     build_target "Windows x86-64 (GNU)" \
-        "windows-x86_64" "" "x86_64-windows-gnu"
+        "$BUILD_ROOT/windows-x86_64" "" "x86_64-windows-gnu"
 
     build_target "Windows ARM64 (GNU)" \
-        "windows-arm64" "" "aarch64-windows-gnu"
+        "$BUILD_ROOT/windows-arm64" "" "aarch64-windows-gnu"
 
     build_target "Linux x86-64 (musl)" \
-        "linux-x86_64" "" "x86_64-linux-musl"
+        "$BUILD_ROOT/linux-x86_64" "" "x86_64-linux-musl"
 
     build_target "Linux ARM64 (musl)" \
-        "linux-arm64" "" "aarch64-linux-musl"
+        "$BUILD_ROOT/linux-arm64" "" "aarch64-linux-musl"
 
     # ============================================================
     # Summary
@@ -135,7 +142,9 @@ set -euo pipefail
     echo "============================================================"
     echo "Mode: $BUILD_MODE"
     echo
-    find macos-x86_64 macos-arm64 windows-x86_64 linux-x86_64 linux-arm64 \
+    find "$BUILD_ROOT/macos-x86_64" "$BUILD_ROOT/macos-arm64" \
+        "$BUILD_ROOT/windows-x86_64" "$BUILD_ROOT/windows-arm64" \
+        "$BUILD_ROOT/linux-x86_64" "$BUILD_ROOT/linux-arm64" \
         -maxdepth 1 -type f -name 'logamuffin*' -print
     echo
 

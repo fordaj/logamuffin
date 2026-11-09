@@ -45,6 +45,9 @@ LogLevel* find_level_mutable(std::vector<LogLevel>& levels,
 const LogLevel* find_level_with_alias(
     const std::vector<LogLevel>& levels,
     const std::string& upperName);
+const LogLevel* find_level_by_value(const std::vector<LogLevel>& levels,
+                                    int value);
+LogLevel ad_hoc_numeric_level(int value);
 
 bool upsert_level(std::vector<LogLevel>& levels,
                  const std::string& upperName,

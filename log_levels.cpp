@@ -73,6 +73,26 @@ const LogLevel* find_level_with_alias(const std::vector<LogLevel>& levels,
     return nullptr;
 }
 
+const LogLevel* find_level_by_value(const std::vector<LogLevel>& levels,
+                                    int value) {
+    // Levels are sorted by (value, name), so the first exact value match is
+    // the canonical category for that number when duplicates exist.
+    for (const auto& entry : levels) {
+        if (entry.value == value) {
+            return &entry;
+        }
+    }
+    return nullptr;
+}
+
+LogLevel ad_hoc_numeric_level(int value) {
+    LogLevel entry;
+    entry.name = std::to_string(value);
+    entry.color = std::string(ANSI_RESET);
+    entry.value = value;
+    return entry;
+}
+
 bool upsert_level(std::vector<LogLevel>& levels,
                   const std::string& upperName,
                   std::optional<int> value,

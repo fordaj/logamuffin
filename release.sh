@@ -113,14 +113,16 @@ set -euo pipefail
         exit 1
     fi
 
-    # Each entry: archive name | binary path | archive format
+    # Each entry: archive name | binary path | archive format.
+    # Binaries are produced by build.sh under build/release/<platform>/
+    # (issue #1); package exactly what build.sh produced.
     TARGETS=(
-        "macos-arm64|macos-arm64/logamuffin|tar.gz"
-        "macos-x86_64|macos-x86_64/logamuffin|tar.gz"
-        "windows-x86_64|windows-x86_64/logamuffin.exe|zip"
-        "windows-aarch64|windows-arm64/logamuffin.exe|zip"
-        "linux-x86_64-musl|linux-x86_64/logamuffin|tar.gz"
-        "linux-aarch64-musl|linux-arm64/logamuffin|tar.gz"
+        "macos-arm64|build/release/macos-arm64/logamuffin|tar.gz"
+        "macos-x86_64|build/release/macos-x86_64/logamuffin|tar.gz"
+        "windows-x86_64|build/release/windows-x86_64/logamuffin.exe|zip"
+        "windows-aarch64|build/release/windows-arm64/logamuffin.exe|zip"
+        "linux-x86_64-musl|build/release/linux-x86_64/logamuffin|tar.gz"
+        "linux-aarch64-musl|build/release/linux-arm64/logamuffin|tar.gz"
     )
 
     for target in "${TARGETS[@]}"; do

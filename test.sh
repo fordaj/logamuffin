@@ -2,7 +2,20 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-LOG_BIN="${LOG_BIN:-$SCRIPT_DIR/macos-x86_64/logamuffin}"
+# Default to the build.sh output location (build/<mode>/<platform>/).
+# Fall back to the run_tests.sh native debug build, then the
+# pre-build/<mode> repo-root location for old checkouts.
+if [[ -z "${LOG_BIN:-}" ]]; then
+    if [[ -x "$SCRIPT_DIR/build/release/macos-x86_64/logamuffin" ]]; then
+        LOG_BIN="$SCRIPT_DIR/build/release/macos-x86_64/logamuffin"
+    elif [[ -x "$SCRIPT_DIR/build/debug/macos-x86_64/logamuffin" ]]; then
+        LOG_BIN="$SCRIPT_DIR/build/debug/macos-x86_64/logamuffin"
+    elif [[ -x "$SCRIPT_DIR/build/debug/logamuffin" ]]; then
+        LOG_BIN="$SCRIPT_DIR/build/debug/logamuffin"
+    else
+        LOG_BIN="$SCRIPT_DIR/build/release/macos-x86_64/logamuffin"
+    fi
+fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 

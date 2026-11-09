@@ -9,7 +9,7 @@ terminating the whole suite (via unittest), unlike a Bash script with
 
 How to run:
     # Against the native build produced by ./run_tests.sh
-    python3 tests/integration/test_cli.py --executable build/logamuffin
+    python3 tests/integration/test_cli.py --executable build/debug/logamuffin
 
     # Against any explicit binary (e.g. a release archive on PATH)
     LOG_BIN=/path/to/logamuffin python3 tests/integration/test_cli.py
@@ -54,6 +54,19 @@ def _candidate_executable() -> Path | None:
 
     suffix = ".exe" if sys.platform.startswith("win") else ""
     candidates = [
+        REPO_ROOT / "build" / "debug" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "release" / "macos-arm64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "release" / "macos-x86_64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "release" / "linux-arm64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "release" / "linux-x86_64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "release" / "windows-x86_64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "release" / "windows-arm64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "debug" / "macos-arm64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "debug" / "macos-x86_64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "debug" / "linux-arm64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "debug" / "linux-x86_64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "debug" / "windows-x86_64" / f"logamuffin{suffix}",
+        REPO_ROOT / "build" / "debug" / "windows-arm64" / f"logamuffin{suffix}",
         REPO_ROOT / "build" / f"logamuffin{suffix}",
         REPO_ROOT / "build" / "native" / f"logamuffin{suffix}",
         REPO_ROOT / "macos-arm64" / f"logamuffin{suffix}",
@@ -74,8 +87,10 @@ def _candidate_executable() -> Path | None:
 EXE: Path | None = _candidate_executable()
 
 # Matches "<YYYY-MM-DD HH:MM:SS,mmm> <host> [<LEVEL>] <source>: <message>"
+# LEVEL may be a word (TRACE) or an ad-hoc number (25, -5), so allow
+# letters, digits, '_' and '-'.
 FILE_LINE_RE = re.compile(
-    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \S+ \[[A-Z]+\] \S+: .+$"
+    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \S+ \[[A-Z0-9_-]+\] \S+: .+$"
 )
 
 
@@ -87,7 +102,7 @@ class LogamuffinTestCase(unittest.TestCase):
             self.fail(
                 "logamuffin executable not found. Build it with ./run_tests.sh "
                 "or point LOG_BIN / --executable at a binary, e.g. "
-                "python3 tests/integration/test_cli.py --executable build/logamuffin"
+                "python3 tests/integration/test_cli.py --executable build/debug/logamuffin"
             )
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
@@ -489,6 +504,109 @@ class TestConcurrentWrites(LogamuffinTestCase):
         self.assertEqual(len(content.splitlines()), count)
 
 
+class TestNumericLevels(LogamuffinTestCase):
+    """Numeric LEVEL argument: words and numbers interchangeably (issue #3)."""
+
+    def test_numeric_matching_builtin_resolves_to_category(self) -> None:
+        cases = [
+            ("5", "TRACE", "5-must-be-TRACE"),
+            ("10", "DEBUG", "10-must-be-DEBUG"),
+            ("20", "INFO", "20-must-be-INFO"),
+            ("30", "WARN", "30-must-be-WARN"),
+            ("40", "ERROR", "40-must-be-ERROR"),
+            ("50", "CRITICAL", "50-must-be-CRITICAL"),
+        ]
+        for num, label, marker in cases:
+            with self.subTest(numeric=num, label=label):
+                log = self.dir / f"num-{num}.log"
+                result = self.run_bin(
+                    [num, marker],
+                    LOG_LEVEL="TRACE", LOG_COLOR="0", LOG_FILE=str(log),
+                )
+                self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
+                content = log.read_text(encoding="utf-8", errors="replace")
+                self.assertIn(f"[{label}]", content)
+                self.assertIn(marker, content)
+
+    def test_numeric_unknown_is_ad_hoc_and_labeled_with_number(self) -> None:
+        for num in ("25", "28", "0"):
+            with self.subTest(numeric=num):
+                log = self.dir / f"adhoc-{num}.log"
+                result = self.run_bin(
+                    [num, f"adhoc-{num}"],
+                    LOG_LEVEL="0", LOG_COLOR="0", LOG_FILE=str(log),
+                )
+                self.assertEqual(result.returncode, 0)
+                content = log.read_text(encoding="utf-8", errors="replace")
+                self.assertIn(f"[{num}]", content)
+
+    def test_numeric_resolves_to_custom_category(self) -> None:
+        log = self.dir / "custom-num.log"
+        result = self.run_bin(
+            ["25", "custom-numeric"],
+            LOG_LEVEL="TRACE", LOG_COLOR="0", LOG_FILE=str(log),
+            LOG_LEVELS="NOTICE=25:blue",
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("[NOTICE]", result.stdout)
+        self.assertIn("custom-numeric", log.read_text(encoding="utf-8", errors="replace"))
+
+    def test_numeric_filtering_uses_number(self) -> None:
+        log = self.dir / "num-filter.log"
+        filtered = self.run_bin(
+            ["20", "filtered-num"],
+            LOG_LEVEL="25", LOG_COLOR="0", LOG_FILE=str(log),
+        )
+        shown = self.run_bin(
+            ["28", "shown-num"],
+            LOG_LEVEL="25", LOG_COLOR="0", LOG_FILE=str(log),
+        )
+        self.assertEqual(filtered.returncode, 0)
+        self.assertEqual(filtered.stdout, "")
+        self.assertEqual(shown.returncode, 0)
+        self.assertIn("shown-num", shown.stdout)
+        self.assertNotIn("filtered-num", log.read_text(encoding="utf-8", errors="replace") if log.is_file() else "")
+
+    def test_numeric_streams_by_value(self) -> None:
+        stdout_result = self.run_bin(["25", "low-stdout"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+        self.assertIn("low-stdout", stdout_result.stdout)
+        self.assertEqual(stdout_result.stderr, "")
+        stderr_result = self.run_bin(["45", "high-stderr"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+        self.assertIn("high-stderr", stderr_result.stderr)
+        self.assertEqual(stderr_result.stdout, "")
+
+    def test_minus_one_resolves_to_always_and_bypasses(self) -> None:
+        log = self.dir / "minus-one.log"
+        result = self.run_bin(
+            ["-1", "bypass-num"],
+            LOG_LEVEL="CRITICAL", LOG_COLOR="0", LOG_FILE=str(log),
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("[ALWAYS]", result.stdout)
+        self.assertIn("bypass-num", result.stdout)
+
+    def test_dashdash_minus_one_also_bypasses(self) -> None:
+        result = self.run_bin(["--", "-1", "dashdash-bypass"], LOG_LEVEL="CRITICAL", LOG_COLOR="0")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("dashdash-bypass", result.stdout)
+
+    def test_plus_number_resolves(self) -> None:
+        result = self.run_bin(["+50", "plus-msg"], LOG_LEVEL="TRACE", LOG_COLOR="0")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("[CRITICAL]", result.stderr)
+
+    def test_out_of_range_number_is_unknown_level(self) -> None:
+        result = self.run_bin(["1000001", "x"])
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Unknown log level: 1000001", result.stderr)
+        self.assertIn("numeric", result.stderr)
+
+    def test_unknown_word_error_mentions_numeric(self) -> None:
+        result = self.run_bin(["BOGUS", "x"])
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("numeric", result.stderr)
+
+
 class TestExitCodes(LogamuffinTestCase):
     def test_success_exit_code_is_zero(self) -> None:
         self.assertEqual(self.run_bin(["INFO", "ok"]).returncode, 0)
@@ -501,6 +619,92 @@ class TestExitCodes(LogamuffinTestCase):
         self.assertEqual(
             self.run_bin(["INFO", "x"], LOG_LEVEL="BOGUS").returncode, 2,
         )
+
+
+@unittest.skipUnless(shutil.which("bash"), "bash required for log helper tests")
+class TestLogHelper(LogamuffinTestCase):
+    """Bash `log` helper from log.sh forwards and sets LOG_SOURCE (issue #2)."""
+
+    def _run_script(self, script: str, **env_overrides: str | None) -> subprocess.CompletedProcess:
+        helper = REPO_ROOT / "log.sh"
+        self.assertTrue(helper.is_file(), "log.sh missing at repo root")
+        script_path = self.dir / "script.sh"
+        script_path.write_text(script, encoding="utf-8")
+        env = self.base_env(**env_overrides)
+        env["LOGAMUFFIN_BIN"] = str(EXE)
+        env["LOGAMUFFIN_HELPER"] = str(helper)
+        return subprocess.run(
+            ["bash", str(script_path)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env=env,
+            cwd=str(self.dir),
+        )
+
+    def test_log_word_forwards_and_sets_source(self) -> None:
+        script = (
+            'source "$LOGAMUFFIN_HELPER"\n'
+            'log INFO "helper-word-msg"\n'
+        )
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
+        self.assertIn("helper-word-msg", result.stdout)
+        self.assertIn("[INFO]", result.stdout)
+        # LOG_SOURCE is derived from the call site (script.sh with line).
+        self.assertIn("script.sh", result.stdout)
+        content = self.read_log()
+        self.assertIn("helper-word-msg", content)
+        self.assertIn("[INFO]", content)
+
+    def test_log_numeric_forwards_and_sets_source(self) -> None:
+        script = (
+            'source "$LOGAMUFFIN_HELPER"\n'
+            'log 50 "helper-numeric-msg"\n'
+            'log 25 "helper-adhoc-msg"\n'
+        )
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        self.assertEqual(result.returncode, 0, f"stderr: {result.stderr!r}")
+        self.assertIn("helper-numeric-msg", result.stderr)
+        self.assertIn("[CRITICAL]", result.stderr)
+        self.assertIn("helper-adhoc-msg", result.stdout)
+        self.assertIn("[25]", result.stdout)
+
+    def test_log_inside_function_includes_function_name(self) -> None:
+        script = (
+            'source "$LOGAMUFFIN_HELPER"\n'
+            'myfunc() { log DEBUG "inside-func"; }\n'
+            'myfunc\n'
+        )
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("inside-func", result.stdout)
+        self.assertIn("myfunc", result.stdout)
+        self.assertIn("script.sh", result.stdout)
+
+    def test_log_preserves_failure_exit_code(self) -> None:
+        script = (
+            'source "$LOGAMUFFIN_HELPER"\n'
+            'log BOGUS "x"\n'
+            'printf "rc=%s" "$?"\n'
+        )
+        result = self._run_script(script, LOG_LEVEL="TRACE", LOG_COLOR="0")
+        self.assertIn("Unknown log level: BOGUS", result.stderr)
+        self.assertIn("rc=2", result.stdout)
+
+    def test_log_respects_caller_environment(self) -> None:
+        script = (
+            'source "$LOGAMUFFIN_HELPER"\n'
+            'log TRACE "trace-should-filter"\n'
+            'log INFO "info-should-show"\n'
+        )
+        result = self._run_script(script, LOG_LEVEL="INFO", LOG_COLOR="0")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("info-should-show", result.stdout)
+        self.assertNotIn("trace-should-filter", result.stdout)
+        content = self.read_log()
+        self.assertIn("info-should-show", content)
+        self.assertNotIn("trace-should-filter", content)
 
 
 def _main() -> None:
