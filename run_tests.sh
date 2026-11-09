@@ -18,19 +18,13 @@ set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-CXX="${CXX:-clang++}"
-if ! command -v "$CXX" >/dev/null 2>&1; then
-    CXX="c++"
-fi
-CXXFLAGS=(-std=c++20 -O0 -g3 -DDEBUG)
+# Single source for TU list + native toolchain (see tools/sources.sh).
+# shellcheck source=tools/sources.sh
+source "$SCRIPT_DIR/tools/sources.sh"
+
 UNIT_BIN="build/debug/tests/unit/test_logamuffin"
 NATIVE_BIN="build/debug/logamuffin"
 EXECUTABLE=""
-
-# Translation units (split from the former 1955-line logamuffin.cpp).
-SOURCES=(logamuffin.cpp logamuffin_core.cpp text_utils.cpp json_parser.cpp color.cpp
-         log_levels.cpp config.cpp platform.cpp)
-UNIT_SOURCES=(logamuffin_core.cpp text_utils.cpp log_levels.cpp)
 
 SKIP_UNIT="false"
 SKIP_INTEGRATION="false"
