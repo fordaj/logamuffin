@@ -63,6 +63,16 @@ bool parse_int_strict(const std::string& raw, int& out) {
     }
 }
 
+int hex_digit_value(char c) {
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return 10 + (c - 'a');
+    if (c >= 'A' && c <= 'F')
+        return 10 + (c - 'A');
+    return -1;
+}
+
 bool parse_bool_string(const std::string& raw, bool& out) {
     const std::string v = uppercase(trim(raw));
     if (is_truthy_token(v)) {

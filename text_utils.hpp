@@ -55,4 +55,8 @@ bool parse_int_strict(const std::string& raw, int& out);
 
 bool parse_bool_string(const std::string& raw, bool& out);
 
+// Returns 0-15 for a hex digit, -1 otherwise. Shared by color and JSON
+// parsers so the digit math cannot drift.
+int hex_digit_value(char c);
+
 } // namespace logamuffin

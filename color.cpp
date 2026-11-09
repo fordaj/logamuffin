@@ -22,7 +22,6 @@ constexpr int kHexRadix = 16;
 constexpr int kHexShortExpand = 17;
 constexpr std::size_t kHexLongLength = 6;
 constexpr std::size_t kHexShortLength = 3;
-constexpr int kHexDigitBase = 10;
 
 // ---------------------------------------------------------------------------
 // Named color table (normalized keys from normalize_key())
@@ -225,137 +224,16 @@ bool ends_with_sgr_terminator(const std::string& text) {
            text.find('[') != std::string::npos;
 }
 
-// Returns 0-15 for a hex digit, -1 otherwise.
-int hex_digit_value(char c) {
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'a' && c <= 'f')
-        return kHexDigitBase + (c - 'a');
-    if (c >= 'A' && c <= 'F')
-        return kHexDigitBase + (c - 'A');
-    return -1;
-}
-
 // Combines two hex digits into a byte (0-255). Caller validated digits.
 int parse_hex_pair(char high, char low) {
     return hex_digit_value(high) * kHexRadix + hex_digit_value(low);
 }
 
-// ---------------------------------------------------------------------------
-// resolve_color helpers — each returns true when it handled the input
-// (success or terminal failure), false to fall through to the next form.
-// Precedence in resolve_color(): esc -> literal esc -> bracket -> hex
-// -> bare SGR -> named.
-// ---------------------------------------------------------------------------
-
-// Full escape sequence containing a real ESC byte (e.g. "\033[0;31m").
-bool resolve_esc_sequence(const std::string& spec,
-                          const std::string& specRaw,
-                          std::string& outEscape, std::string& err) {
-    if (spec.find(kEscapeChar) == std::string::npos)
-        return false;
-    if (ends_with_sgr_terminator(spec)) {
-        outEscape = spec;
-        return true;
-    }
-    err = "invalid color '" + specRaw + "'";
-    return true; // terminal: contains ESC but malformed
-}
-
-// Literal "\033" / "\e" / "\x1b" text (shell-typed, no raw ESC).
-bool resolve_literal_escape(const std::string& spec,
-                            const std::string& specRaw,
-                            std::string& outEscape, std::string& err) {
-    if (spec.find('\\') == std::string::npos)
-        return false;
-    const std::string expanded = expand_literal_escape_text(spec);
-    if (expanded.find(kEscapeChar) != std::string::npos) {
-        if (ends_with_sgr_terminator(expanded)) {
-            outEscape = expanded;
-            return true;
-        }
-        err = "invalid color '" + specRaw + "'";
-        return true; // terminal: expanded but malformed
-    }
-    // A backslash that expands to no ESC is invalid, not a name.
-    err = "invalid color '" + specRaw + "'";
+bool digits_valid(const std::string& digits) {
+    for (char c : digits)
+        if (hex_digit_value(c) < 0)
+            return false;
     return true;
-}
-
-// "[0;31m" bracket form without ESC.
-bool resolve_bracket_sgr(const std::string& spec,
-                         const std::string& specRaw, std::string& outEscape,
-                         std::string& err) {
-    if (spec.empty() || spec.front() != '[' || spec.back() != 'm')
-        return false;
-    const std::string inner = spec.substr(1, spec.size() - 2);
-    if (is_sgr_code_text(inner)) {
-        outEscape = std::string(1, kEscapeChar) + spec;
-        return true;
-    }
-    err = "invalid color '" + specRaw + "'";
-    return true; // terminal: bracket shape but bad params
-}
-
-// Hex truecolor: #RRGGBB or #RGB.
-bool resolve_hex_truecolor(const std::string& spec,
-                           const std::string& specRaw,
-                           std::string& outEscape, std::string& err) {
-    if (spec.empty() || spec.front() != '#')
-        return false;
-    const std::string hexDigits = spec.substr(1);
-    auto digits_valid = [](const std::string& digits) {
-        for (char c : digits)
-            if (hex_digit_value(c) < 0)
-                return false;
-        return true;
-    };
-    if (hexDigits.size() == kHexLongLength) {
-        if (!digits_valid(hexDigits)) {
-            err = "invalid color '" + specRaw + "'";
-            return true;
-        }
-        const int red = parse_hex_pair(hexDigits[0], hexDigits[1]);
-        const int green = parse_hex_pair(hexDigits[2], hexDigits[3]);
-        const int blue = parse_hex_pair(hexDigits[4], hexDigits[5]);
-        outEscape = "\x1b[38;2;" + std::to_string(red) + ";" +
-                    std::to_string(green) + ";" + std::to_string(blue) + "m";
-        return true;
-    }
-    if (hexDigits.size() == kHexShortLength) {
-        if (!digits_valid(hexDigits)) {
-            err = "invalid color '" + specRaw + "'";
-            return true;
-        }
-        const int red = hex_digit_value(hexDigits[0]) * kHexShortExpand;
-        const int green = hex_digit_value(hexDigits[1]) * kHexShortExpand;
-        const int blue = hex_digit_value(hexDigits[2]) * kHexShortExpand;
-        outEscape = "\x1b[38;2;" + std::to_string(red) + ";" +
-                    std::to_string(green) + ";" + std::to_string(blue) + "m";
-        return true;
-    }
-    err = "invalid color '" + specRaw + "'";
-    return true; // terminal: '#' but wrong length
-}
-
-// Bare SGR code: "31", "0;31", "1;91" (',' accepted as ';').
-bool resolve_bare_sgr(const std::string& spec, std::string& outEscape) {
-    if (!is_sgr_code_text(spec))
-        return false;
-    std::string code = spec;
-    std::replace(code.begin(), code.end(), ',', ';');
-    outEscape = "\x1b[" + code + "m";
-    return true;
-}
-
-// Named color (case-insensitive, separators ignored via normalize_key()).
-bool resolve_named_color(const std::string& spec,
-                         const std::string& specRaw, std::string& outEscape,
-                         std::string& err) {
-    if (color_name_to_escape(normalize_key(spec), outEscape))
-        return true;
-    err = "unknown color '" + specRaw + "'";
-    return true; // terminal: final fallback
 }
 
 } // namespace
@@ -367,19 +245,70 @@ bool resolve_color(const std::string& specRaw, std::string& outEscape,
         err = "empty color";
         return false;
     }
-    if (resolve_esc_sequence(spec, specRaw, outEscape, err))
-        return !err.empty() ? false : true;
-    if (resolve_literal_escape(spec, specRaw, outEscape, err))
-        return !err.empty() ? false : true;
-    if (resolve_bracket_sgr(spec, specRaw, outEscape, err))
-        return !err.empty() ? false : true;
-    if (resolve_hex_truecolor(spec, specRaw, outEscape, err))
-        return !err.empty() ? false : true;
-    if (resolve_bare_sgr(spec, outEscape))
+    // Precedence: esc -> literal esc -> bracket -> hex -> bare SGR -> named.
+    // Full escape sequence containing a real ESC byte (e.g. "\033[0;31m").
+    if (spec.find(kEscapeChar) != std::string::npos) {
+        if (ends_with_sgr_terminator(spec)) {
+            outEscape = spec;
+            return true;
+        }
+        err = "invalid color '" + specRaw + "'";
+        return false;
+    }
+    // Literal "\033" / "\e" / "\x1b" text (shell-typed, no raw ESC).
+    if (spec.find('\\') != std::string::npos) {
+        const std::string expanded = expand_literal_escape_text(spec);
+        if (expanded.find(kEscapeChar) != std::string::npos &&
+            ends_with_sgr_terminator(expanded)) {
+            outEscape = expanded;
+            return true;
+        }
+        // A backslash that expands to no ESC is invalid, not a name.
+        err = "invalid color '" + specRaw + "'";
+        return false;
+    }
+    // "[0;31m" bracket form without ESC.
+    if (!spec.empty() && spec.front() == '[' && spec.back() == 'm') {
+        const std::string inner = spec.substr(1, spec.size() - 2);
+        if (is_sgr_code_text(inner)) {
+            outEscape = std::string(1, kEscapeChar) + spec;
+            return true;
+        }
+        err = "invalid color '" + specRaw + "'";
+        return false;
+    }
+    // Hex truecolor: #RRGGBB or #RGB.
+    if (!spec.empty() && spec.front() == '#') {
+        const std::string hexDigits = spec.substr(1);
+        if (hexDigits.size() == kHexLongLength && digits_valid(hexDigits)) {
+            const int red = parse_hex_pair(hexDigits[0], hexDigits[1]);
+            const int green = parse_hex_pair(hexDigits[2], hexDigits[3]);
+            const int blue = parse_hex_pair(hexDigits[4], hexDigits[5]);
+            outEscape = "\x1b[38;2;" + std::to_string(red) + ";" +
+                        std::to_string(green) + ";" + std::to_string(blue) + "m";
+            return true;
+        }
+        if (hexDigits.size() == kHexShortLength && digits_valid(hexDigits)) {
+            const int red = hex_digit_value(hexDigits[0]) * kHexShortExpand;
+            const int green = hex_digit_value(hexDigits[1]) * kHexShortExpand;
+            const int blue = hex_digit_value(hexDigits[2]) * kHexShortExpand;
+            outEscape = "\x1b[38;2;" + std::to_string(red) + ";" +
+                        std::to_string(green) + ";" + std::to_string(blue) + "m";
+            return true;
+        }
+        err = "invalid color '" + specRaw + "'";
+        return false;
+    }
+    // Bare SGR code: "31", "0;31", "1;91" (',' accepted as ';').
+    if (is_sgr_code_text(spec)) {
+        std::string code = spec;
+        std::replace(code.begin(), code.end(), ',', ';');
+        outEscape = "\x1b[" + code + "m";
         return true;
-    if (resolve_named_color(spec, specRaw, outEscape, err))
-        return !err.empty() ? false : true;
-    // Unreachable: named is terminal. Kept for exhaustiveness.
+    }
+    // Named color (case-insensitive, separators ignored via normalize_key()).
+    if (color_name_to_escape(normalize_key(spec), outEscape))
+        return true;
     err = "unknown color '" + specRaw + "'";
     return false;
 }
