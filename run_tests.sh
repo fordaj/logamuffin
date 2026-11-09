@@ -30,7 +30,7 @@ EXECUTABLE=""
 # Translation units (split from the former 1955-line logamuffin.cpp).
 SOURCES=(logamuffin.cpp logamuffin_core.cpp text_utils.cpp json_parser.cpp color.cpp
          log_levels.cpp config.cpp platform.cpp)
-UNIT_SOURCES=(logamuffin_core.cpp text_utils.cpp)
+UNIT_SOURCES=(logamuffin_core.cpp text_utils.cpp log_levels.cpp)
 
 SKIP_UNIT="false"
 SKIP_INTEGRATION="false"

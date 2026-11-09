@@ -27,17 +27,17 @@ struct LevelNameEntry {
     Level level;
 };
 
-// Name → Level table (canonical names, aliases, numeric forms).
+// Name → Level table (canonical names + numeric forms). Aliases
+// (WARNING→WARN, FATAL→CRITICAL) are single-sourced in log_levels.hpp
+// (kLevelAliases) and resolved via level_alias_target() below.
 // Adding a level is a one-line data addition; lookup is linear scan.
-constexpr std::array<LevelNameEntry, 16> kLevelNameTable = {{
+constexpr std::array<LevelNameEntry, 14> kLevelNameTable = {{
     {"TRACE", Level::Trace},
     {"DEBUG", Level::Debug},
     {"INFO", Level::Info},
     {"WARN", Level::Warning},
-    {"WARNING", Level::Warning},
     {"ERROR", Level::Error},
     {"CRITICAL", Level::Critical},
-    {"FATAL", Level::Critical},
     {"ALWAYS", Level::Always},
     {"-1", Level::Always},
     {"5", Level::Trace},
@@ -46,7 +46,7 @@ constexpr std::array<LevelNameEntry, 16> kLevelNameTable = {{
     {"30", Level::Warning},
     {"40", Level::Error},
     {"50", Level::Critical},
-    // Note: numeric forms map to built-ins only; custom numeric levels
+    // Note: numeric forms map to built-ins only. Custom numeric levels
     // are handled by resolve_level() in logamuffin.cpp via Config.
 }};
 
@@ -55,6 +55,16 @@ bool lookup_level_name(std::string_view upperValue, Level& out) {
         if (upperValue == entry.name) {
             out = entry.level;
             return true;
+        }
+    }
+    // Aliases consult the single-source table in log_levels.hpp.
+    if (const auto canonical = level_alias_target(upperValue);
+        !canonical.empty()) {
+        for (const auto& entry : kLevelNameTable) {
+            if (canonical == entry.name) {
+                out = entry.level;
+                return true;
+            }
         }
     }
     return false;
