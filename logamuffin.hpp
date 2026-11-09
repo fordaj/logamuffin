@@ -25,8 +25,19 @@
 #include <vector>
 
 #include "ansi_colors.hpp"
+#include "log_levels.hpp"
 
 namespace logamuffin {
+
+// Terminal-width thresholds for console prefix detail. Single source of
+// truth: logamuffin.cpp (run) and format_console_output() both consult
+// these, so captured (non-TTY) output always uses kFullFormatWidth.
+inline constexpr int kFullFormatWidth = 180;
+inline constexpr int kMediumFormatWidth = 120;
+
+// Trailing reserve sizes for formatted output buffers.
+inline constexpr std::size_t kConsoleOutputReserve = 16;
+inline constexpr std::size_t kFileEntryReserve = 8;
 
 enum class Level : int {
     Always   = -1,
@@ -177,24 +188,24 @@ inline std::string join_message(int argc, char* argv[], int start = 2) {
 
 // Plain-text file entry, independent of console colors.
 // Format: "<time> <pc> [<LEVEL>] <source>: <message>\n"
+// Canonical LogLevel form used by run() with Config levels (custom
+// categories included). The Level-enum form delegates here.
 inline std::string format_file_entry(
     std::string_view time,
     std::string_view pc,
-    Level level,
+    const LogLevel& level,
     std::string_view source,
     std::string_view message) {
-    const auto& li = info(level);
-
     std::string entry;
     entry.reserve(
         time.size() + pc.size() + source.size() +
-        message.size() + li.name.size() + 8);
+        message.size() + level.name.size() + kFileEntryReserve);
 
     entry += time;
     entry += ' ';
     entry += pc;
     entry += " [";
-    entry += li.name;
+    entry += level.name;
     entry += "] ";
     entry += source;
     entry += ": ";
@@ -204,24 +215,38 @@ inline std::string format_file_entry(
     return entry;
 }
 
-// Console output line (with optional ANSI colors).
-// width selects how much context is shown:
-//   >= 180: time + hostname + source, >= 120: source only, below: level only.
-// This mirrors the non-TTY fallback (width 180) used by run() when output
-// is captured, so captured output always includes the full prefix.
-inline std::string format_console_output(
+inline std::string format_file_entry(
     std::string_view time,
     std::string_view pc,
     Level level,
     std::string_view source,
+    std::string_view message) {
+    const auto& levelInfo = info(level);
+    const LogLevel logLevel{std::string(levelInfo.name),
+                            std::string(levelInfo.color),
+                            static_cast<int>(level)};
+    return format_file_entry(time, pc, logLevel, source, message);
+}
+
+// Console output line (with optional ANSI colors).
+// width selects how much context is shown:
+//   >= kFullFormatWidth: time + hostname + source,
+//   >= kMediumFormatWidth: source only,
+//   below: level only.
+// This mirrors the non-TTY fallback (kFullFormatWidth) used by run()
+// when output is captured, so captured output always includes the
+// full prefix. Canonical LogLevel form; Level-enum form delegates here.
+inline std::string format_console_output(
+    std::string_view time,
+    std::string_view pc,
+    const LogLevel& level,
+    std::string_view source,
     std::string_view message,
     bool color,
     int width) {
-    const auto& li = info(level);
-
     std::string prefix;
 
-    if (width >= 180) {
+    if (width >= kFullFormatWidth) {
         if (color) {
             prefix += ANSI_GREEN;
             prefix += time;
@@ -244,7 +269,7 @@ inline std::string format_console_output(
             prefix += source;
             prefix += ": ";
         }
-    } else if (width >= 120) {
+    } else if (width >= kMediumFormatWidth) {
         if (color) {
             prefix += ANSI_BLUE;
             prefix += source;
@@ -260,19 +285,19 @@ inline std::string format_console_output(
     if (color) {
         prefix += ANSI_HI_BLACK;
         prefix += '[';
-        prefix += li.name;
+        prefix += level.name;
         prefix += ']';
         prefix += ANSI_RESET;
         prefix += ' ';
-        prefix += li.color;
+        prefix += level.color;
     } else {
         prefix += '[';
-        prefix += li.name;
+        prefix += level.name;
         prefix += "] ";
     }
 
     std::string output;
-    output.reserve(prefix.size() + message.size() + 16);
+    output.reserve(prefix.size() + message.size() + kConsoleOutputReserve);
     output += prefix;
     output += message;
 
@@ -282,6 +307,22 @@ inline std::string format_console_output(
     output += '\n';
 
     return output;
+}
+
+inline std::string format_console_output(
+    std::string_view time,
+    std::string_view pc,
+    Level level,
+    std::string_view source,
+    std::string_view message,
+    bool color,
+    int width) {
+    const auto& levelInfo = info(level);
+    const LogLevel logLevel{std::string(levelInfo.name),
+                            std::string(levelInfo.color),
+                            static_cast<int>(level)};
+    return format_console_output(time, pc, logLevel, source, message,
+                                 color, width);
 }
 
 } // namespace logamuffin
