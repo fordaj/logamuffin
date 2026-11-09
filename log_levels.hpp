@@ -61,11 +61,6 @@ const LogLevel* find_level_exact(const std::vector<LogLevel>& levels,
                                 const std::string& upperName);
 LogLevel* find_level_by_name_mut(std::vector<LogLevel>& levels,
                                  const std::string& upperName);
-// Back-compat alias (renamed for naming consistency).
-inline LogLevel* find_level_mutable(std::vector<LogLevel>& levels,
-                                    const std::string& upperName) {
-    return find_level_by_name_mut(levels, upperName);
-}
 const LogLevel* find_level_with_alias(
     const std::vector<LogLevel>& levels,
     const std::string& upperName);
