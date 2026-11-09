@@ -9,7 +9,8 @@
 #   1 version/help, 2 severity levels + colors, 3 aliases + case + joining,
 #   4 threshold filtering, 5 stdout vs stderr, 6 environment surface,
 #   7 extensible categories, 8 JSON config, 9 precedence + autodiscovery,
-#   10 persistent file logging, 11 concurrent writes, 12 shell patterns.
+#   10 persistent file logging, 11 concurrent writes, 12 shell patterns,
+#   13 numeric levels + Bash `log` helper (issues #3/#2).
 #
 # Intentionally no `set -e`: several sections intentionally trigger
 # expected failures (unknown level, bad config) to show exit codes.
@@ -29,51 +30,69 @@ resolve_logger() {
         return 0
     fi
 
-    # Fresh native build from ./run_tests.sh (single-command path).
-    if [[ -x "$SCRIPT_DIR/build/logamuffin" ]]; then
-        printf '%s\n' "$SCRIPT_DIR/build/logamuffin"
+    # Fresh native debug build from ./run_tests.sh (single-command path).
+    if [[ -x "$SCRIPT_DIR/build/debug/logamuffin" ]]; then
+        printf '%s\n' "$SCRIPT_DIR/build/debug/logamuffin"
         return 0
     fi
 
-    # Platform build from ./build.sh.
-    local build_dir
+    # Platform build from ./build.sh (build/release|debug/<platform>/).
+    local platform
     case "$(uname -s):$(uname -m)" in
     Darwin:x86_64)
-        build_dir="macos-x86_64"
+        platform="macos-x86_64"
         ;;
     Darwin:arm64)
-        build_dir="macos-arm64"
+        platform="macos-arm64"
         ;;
     MINGW*:x86_64 | MSYS*:x86_64 | CYGWIN*:x86_64)
-        build_dir="windows-x86_64"
+        platform="windows-x86_64"
         ;;
     MINGW*:ARM64 | MSYS*:ARM64 | CYGWIN*:ARM64)
-        build_dir="windows-arm64"
+        platform="windows-arm64"
         ;;
     Linux:x86_64)
-        build_dir="linux-x86_64"
+        platform="linux-x86_64"
         ;;
     Linux:aarch64 | Linux:arm64)
-        build_dir="linux-arm64"
+        platform="linux-arm64"
         ;;
     *)
         return 1
         ;;
     esac
 
-    local candidate="$SCRIPT_DIR/$build_dir/logamuffin"
+    local candidate
+    for candidate in \
+        "$SCRIPT_DIR/build/release/$platform/logamuffin" \
+        "$SCRIPT_DIR/build/debug/$platform/logamuffin"; do
+        # Windows build output uses the .exe suffix.
+        case "$(uname -s)" in
+        MINGW* | MSYS* | CYGWIN*)
+            candidate="${candidate}.exe"
+            ;;
+        esac
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
 
-    # Windows build output uses the .exe suffix.
-    case "$(uname -s)" in
-    MINGW* | MSYS* | CYGWIN*)
-        candidate="${candidate}.exe"
-        ;;
-    esac
-
-    if [[ -x "$candidate" ]]; then
-        printf '%s\n' "$candidate"
-        return 0
-    fi
+    # Legacy fallbacks (pre-build/<mode> layout): native run_tests.sh
+    # output, then repo-root platform dirs.
+    for candidate in \
+        "$SCRIPT_DIR/build/logamuffin" \
+        "$SCRIPT_DIR/$platform/logamuffin"; do
+        case "$(uname -s)" in
+        MINGW* | MSYS* | CYGWIN*)
+            candidate="${candidate}.exe"
+            ;;
+        esac
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
 
     return 1
 }
@@ -647,6 +666,79 @@ cat "$DEMO_TMP/err"
 "$LOGGER" 2>"$DEMO_TMP/err"
 printf '  missing arguments exit %s (expected 2)\n' "$?"
 cat "$DEMO_TMP/err"
+
+# ============================================================
+# 13. Numeric levels and the Bash `log` helper (issues #3/#2)
+# ============================================================
+
+section '13. Numeric levels and the Bash log helper'
+
+note 'LEVEL may be a word (TRACE) or a number (50). A number matching a'
+note 'configured value uses that category (50 -> CRITICAL); any other'
+note 'number is shown as-is ([25]) and filtered/streamed by its value.'
+
+cmd "TRACE \"word level\""
+"$LOGGER" TRACE "word level (TRACE)"
+
+cmd "50 \"numeric 50 -> CRITICAL\"  (stderr)"
+"$LOGGER" 50 "numeric 50 -> CRITICAL"
+
+cmd "5 \"numeric 5 -> TRACE\""
+"$LOGGER" 5 "numeric 5 -> TRACE"
+
+cmd "20 \"numeric 20 -> INFO\""
+"$LOGGER" 20 "numeric 20 -> INFO"
+
+cmd "25 \"ad-hoc 25 (no category at 25)\""
+"$LOGGER" 25 "ad-hoc 25 (no category at 25)"
+
+cmd "LOG_LEVELS='NOTICE=25:blue' 25 \"custom NOTICE via number\""
+LOG_LEVELS='NOTICE=25:blue' LOG_LEVEL=TRACE "$LOGGER" 25 "custom NOTICE via number"
+
+cmd "LOG_LEVEL=INFO 0 \"filtered: 0 below INFO (no output)\""
+LOG_LEVEL=INFO "$LOGGER" 0 "filtered: 0 below INFO (no output)"
+
+cmd "LOG_LEVEL=25 28 \"shown: 28 at/above numeric 25\""
+LOG_LEVEL=25 "$LOGGER" 28 "shown: 28 at/above numeric 25"
+
+cmd "LOG_LEVEL=CRITICAL -1 \"ALWAYS via -1 (bypasses CRITICAL)\""
+LOG_LEVEL=CRITICAL "$LOGGER" -1 "ALWAYS via -1 (bypasses CRITICAL)"
+
+note '--- Bash `log` helper (source log.sh, call `log`) ---'
+note 'Sets LOG_SOURCE to the call site (file:function:line) and'
+note 'forwards LEVEL (word or number) + message to logamuffin.'
+note 'Respects LOG_LEVEL / LOG_FILE / LOG_COLOR / config precedence.'
+
+export LOGAMUFFIN_BIN="$LOGGER"
+# shellcheck source=log.sh
+source "$SCRIPT_DIR/log.sh"
+
+cmd "log INFO \"via log helper (source = demo.sh:line)\""
+log INFO "via log helper (source = demo.sh:line)"
+
+cmd "log 50 \"via log helper, numeric\"  (stderr)"
+log 50 "via log helper, numeric"
+
+cmd "log TRACE \"via log helper, word\""
+log TRACE "via log helper, word"
+
+demo_log_func() {
+    # LOG_SOURCE should include this function name + call line.
+    log DEBUG "via log helper inside demo_log_func"
+}
+
+cmd "demo_log_func"
+demo_log_func
+
+note '--- exit codes via log helper ---'
+log INFO "helper success"
+printf '  (exit %s)\n' "$?"
+
+log BOGUS "helper unknown level" 2>"$DEMO_TMP/err"
+printf '  helper unknown level exit %s (expected 2)\n' "$?"
+cat "$DEMO_TMP/err"
+
+unset LOGAMUFFIN_BIN
 
 # ============================================================
 # Footer

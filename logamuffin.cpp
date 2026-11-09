@@ -31,6 +31,8 @@ std::string get_source(const Config& cfg, const char* argv0) {
 void print_usage(std::ostream& out, const Config& cfg) {
     out << "Usage: logamuffin [--config <path>] LEVEL MESSAGE "
            "[MESSAGE ...]\n"
+        << "LEVEL is a level name (e.g. TRACE) or a numeric value "
+           "(e.g. 50).\n"
         << "Levels: " << valid_levels_string(cfg) << "\n"
         << "Options:\n"
         << "  --config <path>  Use the JSON config file at <path> "
@@ -48,6 +50,11 @@ void print_help(std::ostream& out) {
         << "\n"
         << "Usage: logamuffin [--config <path>] LEVEL MESSAGE "
            "[MESSAGE ...]\n"
+        << "\n"
+        << "LEVEL is a level name (e.g. TRACE, INFO) or a numeric value "
+           "(e.g. 50). A number that matches a configured category value "
+           "uses that category; any other number is logged as-is "
+           "(e.g. [50]) and is filtered against the minimum level.\n"
         << "\n"
         << "Default levels (name, numeric value, default color):\n"
         << "  ALWAYS   -1 purple   (bypasses the minimum level filter)\n"
@@ -136,6 +143,17 @@ int run(int argc, char* argv[]) {
             cliConfigPath = path;
             continue;
         }
+        {
+            int numericCandidate = 0;
+            // A negative integer (e.g. -1) is a LEVEL, not an option.
+            if (parse_int_strict(arg, numericCandidate) &&
+                (arg.empty() || arg[0] == '+' || arg[0] == '-' ||
+                 (arg[0] >= '0' && arg[0] <= '9'))) {
+                // Only treat it as LEVEL when the whole arg is
+                // numeric; leading-dash words stay unknown options.
+                break;
+            }
+        }
         if (arg.rfind("--", 0) == 0 || (arg.size() > 1 && arg[0] == '-')) {
             std::cerr << "logamuffin: unknown option: " << arg << '\n';
             return 2;
@@ -188,19 +206,35 @@ int run(int argc, char* argv[]) {
         return 2;
     }
 
-    const std::string levelUpper = uppercase(trim(argv[idx]));
-    const LogLevel* found =
+    const std::string levelRaw = trim(argv[idx]);
+    const std::string levelUpper = uppercase(levelRaw);
+    const LogLevel* foundNamed =
         find_level_with_alias(cfg.levels, levelUpper);
-    if (!found) {
-        std::cerr << "Unknown log level: " << argv[idx]
-                  << ". Valid levels: " << valid_levels_string(cfg)
-                  << '\n';
-        return 2;
-    }
 
-    // Copy the resolved level so filtering and output stay stable even
-    // though cfg.levels is already sorted.
-    const LogLevel level = *found;
+    LogLevel level;
+    if (foundNamed) {
+        // Word name (including WARN/WARNING, CRITICAL/FATAL aliases).
+        level = *foundNamed;
+    } else {
+        int numericValue = 0;
+        if (!parse_int_strict(levelRaw, numericValue)) {
+            std::cerr << "Unknown log level: " << argv[idx]
+                      << ". Valid levels: " << valid_levels_string(cfg)
+                      << " (or a numeric value like 50)\n";
+            return 2;
+        }
+        // Numeric LEVEL (issue #3): resolve to a category with the same
+        // value when one exists (e.g. 50 -> CRITICAL, 25 -> NOTICE);
+        // otherwise emit an ad-hoc numeric level ([25], [50]) with the
+        // default color. Filtering and stderr routing use the number.
+        const LogLevel* byValue =
+            find_level_by_value(cfg.levels, numericValue);
+        if (byValue) {
+            level = *byValue;
+        } else {
+            level = ad_hoc_numeric_level(numericValue);
+        }
+    }
 
     // Join all message arguments with spaces.
     std::string message;

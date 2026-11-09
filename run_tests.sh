@@ -2,7 +2,7 @@
 # Run the complete logamuffin test suite (unit + CLI integration).
 #
 #   ./run_tests.sh                      # full suite (dev build)
-#   ./run_tests.sh --executable ./build/macos-arm64/logamuffin
+#   ./run_tests.sh --executable ./build/release/macos-arm64/logamuffin
 #   ./run_tests.sh --skip-unit          # integration only
 #   ./run_tests.sh --skip-integration   # unit only
 #   ./run_tests.sh --help
@@ -23,8 +23,8 @@ if ! command -v "$CXX" >/dev/null 2>&1; then
     CXX="c++"
 fi
 CXXFLAGS=(-std=c++20 -O0 -g3 -DDEBUG)
-UNIT_BIN="build/tests/unit/test_logamuffin"
-NATIVE_BIN="build/logamuffin"
+UNIT_BIN="build/debug/tests/unit/test_logamuffin"
+NATIVE_BIN="build/debug/logamuffin"
 EXECUTABLE=""
 
 # Translation units (split from the former 1955-line logamuffin.cpp).
@@ -56,7 +56,7 @@ Environment:
 
 Examples:
   ./run_tests.sh
-  ./run_tests.sh --executable ./macos-arm64/logamuffin
+  ./run_tests.sh --executable ./build/release/macos-arm64/logamuffin
   LOG_BIN=./logamuffin python3 tests/integration/test_cli.py
 
 On Windows, run the integration suite directly:
@@ -133,7 +133,7 @@ if [[ -n "$EXECUTABLE" && ! -x "$EXECUTABLE" && ! -f "$EXECUTABLE" ]]; then
 fi
 
 if [[ "$CLEAN" == "true" ]]; then
-    rm -rf -- build/tests build/logamuffin
+    rm -rf -- build/debug/tests build/debug/logamuffin
 fi
 
 UNIT_STATUS="skipped"

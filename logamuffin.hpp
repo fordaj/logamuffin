@@ -89,6 +89,13 @@ inline bool parse_level(std::string value, Level& out) {
     else if (value == "FATAL" || value == "CRITICAL")
         out = Level::Critical;
     else if (value == "ALWAYS") out = Level::Always;
+    else if (value == "-1") out = Level::Always;
+    else if (value == "5")  out = Level::Trace;
+    else if (value == "10") out = Level::Debug;
+    else if (value == "20") out = Level::Info;
+    else if (value == "30") out = Level::Warning;
+    else if (value == "40") out = Level::Error;
+    else if (value == "50") out = Level::Critical;
     else return false;
 
     return true;

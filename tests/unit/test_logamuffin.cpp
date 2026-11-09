@@ -122,6 +122,23 @@ TEST_CASE("parse_level accepts canonical names and aliases case-insensitively") 
         CHECK(parse_level("always", out));
         CHECK(out == Level::Always);
     }
+
+    SUBCASE("numeric built-in values") {
+        CHECK(parse_level("-1", out));
+        CHECK(out == Level::Always);
+        CHECK(parse_level("5", out));
+        CHECK(out == Level::Trace);
+        CHECK(parse_level("10", out));
+        CHECK(out == Level::Debug);
+        CHECK(parse_level("20", out));
+        CHECK(out == Level::Info);
+        CHECK(parse_level("30", out));
+        CHECK(out == Level::Warning);
+        CHECK(parse_level("40", out));
+        CHECK(out == Level::Error);
+        CHECK(parse_level("50", out));
+        CHECK(out == Level::Critical);
+    }
 }
 
 TEST_CASE("parse_level rejects invalid values") {

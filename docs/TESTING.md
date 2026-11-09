@@ -34,8 +34,8 @@ No other dependencies. The doctest header is already vendored at
 
 This builds:
 
-1. The unit-test binary: `build/tests/unit/test_logamuffin`
-2. A fresh native `logamuffin` binary: `build/logamuffin`
+1. The unit-test binary: `build/debug/tests/unit/test_logamuffin`
+2. A fresh native `logamuffin` binary: `build/debug/logamuffin`
    (compiled directly with the native compiler — not the full
    six-target `build.sh` cross-compile, which needs Zig).
 
@@ -53,7 +53,7 @@ stopping the suite.
 ./run_tests.sh --help
 
 # Test a packaged release binary instead of a fresh dev build:
-./run_tests.sh --executable ./macos-arm64/logamuffin
+./run_tests.sh --executable ./build/release/macos-arm64/logamuffin
 ./run_tests.sh --executable /path/to/logamuffin.exe
 ```
 
@@ -61,7 +61,7 @@ The integration suite can also be run directly, on any platform:
 
 ```bash
 # Explicit binary (same as --executable):
-python3 tests/integration/test_cli.py --executable build/logamuffin
+python3 tests/integration/test_cli.py --executable build/debug/logamuffin
 
 # Via environment variable (also works with unittest discovery):
 LOG_BIN=/path/to/logamuffin python3 tests/integration/test_cli.py
@@ -72,8 +72,12 @@ LOG_BIN=logamuffin.exe python tests\integration\test_cli.py
 ```
 
 If no binary is specified, the integration suite searches (in order):
-`build/logamuffin`, `build/native/logamuffin`, the `macos-*` /
-`linux-*` / `windows-*` build directories, then `PATH`.
+`build/debug/logamuffin`, `build/release/<platform>/logamuffin`
+and `build/debug/<platform>/logamuffin` (where `<platform>` is
+`macos-arm64`, `macos-x86_64`, `linux-arm64`, `linux-x86_64`,
+`windows-x86_64`, `windows-arm64`), legacy `build/logamuffin` /
+`build/native/logamuffin` and repo-root platform directories, then
+`PATH`.
 
 ## Architecture
 
@@ -164,24 +168,32 @@ need `logamuffin.hpp`.
 
 ### What is covered where
 
-**Unit tests** (`tests/unit/test_logamuffin.cpp`, 19 cases / 211
-assertions) test *pure helpers*: case conversion, path basenames,
-all level names + aliases + case-insensitivity, invalid-name
-rejection, numeric ordering, display names/colors, labels
-(`WARN`, `CRITICAL`), `\r` cleaning, `LOG_COLOR` truthiness,
-`LOG_SOURCE` fallback, filtering truth table, message joining, file
-and console formatting (including the 120/180 width thresholds and
-ANSI branches), and the `YYYY-MM-DD HH:MM:SS,mmm` timestamp shape.
+**Unit tests** (`tests/unit/test_logamuffin.cpp`) test *pure helpers*:
+case conversion, path basenames, all level names + aliases +
+case-insensitivity, numeric built-in values (`-1`, `5`, `10`, `20`,
+`30`, `40`, `50`), invalid-name rejection, numeric ordering,
+display names/colors, labels (`WARN`, `CRITICAL`), `\r` cleaning,
+`LOG_COLOR` truthiness, `LOG_SOURCE` fallback, filtering truth
+table, message joining, file and console formatting (including the
+120/180 width thresholds and ANSI branches), and the
+`YYYY-MM-DD HH:MM:SS,mmm` timestamp shape.
 
-**Integration tests** (`tests/integration/test_cli.py`, 42 test
-methods, many with `subTest`s) test *observable behavior*:
+**Integration tests** (`tests/integration/test_cli.py`, many with
+`subTest`s) test *observable behavior*:
 
 - Arguments & validation: `--version`, missing/incomplete args,
-  unknown level (lists valid levels), `--version extra`, lowercase
-  levels, empty message.
+  unknown level (lists valid levels and numeric hint), `--version
+  extra`, lowercase levels, empty message.
+- Numeric levels (issue #3): builtin numbers resolve to categories,
+  unknown numbers are ad-hoc `[25]` levels, custom categories resolve
+  by number, numeric filtering/streams, `-1`/`-- -1`/`+50` handling,
+  out-of-range rejection.
 - Severity aliases & filtering: every documented level, `WARN` vs
   `WARNING`, `FATAL` vs `CRITICAL`, default `INFO` threshold,
   `LOG_LEVEL` overrides, `ALWAYS` bypass, filtered exit `0`.
+- Bash `log` helper (issue #2): word/numeric forwarding, per-call
+  `LOG_SOURCE` file/function/line, exit-code preservation, and
+  caller-environment respect.
 - Environment: invalid `LOG_LEVEL`, `LOG_LEVEL=ALWAYS` rejected,
   case/alias thresholds, default + empty `LOG_FILE` fallback to
   `.logs/log.log`, `LOG_SOURCE` override vs executable-name default.
@@ -252,7 +264,9 @@ tests/unit/test_logamuffin.cpp     doctest unit tests
 tests/integration/test_cli.py      Python stdlib CLI tests
 tools/doctest/v2.5.3/doctest.h     vendored doctest
 test.sh                            legacy POSIX smoke test (preserved)
+log.sh                             Bash `log` helper (source for `log`)
 docs/TESTING.md                    this file
-build/                             ignored build outputs
+build/                             ignored outputs: build/debug/,
+                                 build/release/<platform>/
 ```
 
