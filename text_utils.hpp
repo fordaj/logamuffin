@@ -6,7 +6,9 @@
 // module can depend on them explicitly instead of sharing an anonymous
 // namespace. No I/O, no platform dependencies.
 
+#include <array>
 #include <string>
+#include <string_view>
 
 namespace logamuffin {
 
@@ -14,6 +16,30 @@ namespace logamuffin {
 // Level values come from env/JSON/config strings; larger magnitudes are
 // treated as invalid to catch configuration mistakes early.
 inline constexpr int kLevelValueLimit = 1000000;
+
+// Boolean tokens for env/config values (uppercase, trimmed). Single
+// source so env_enabled(), parse_bool_string(), and LOG_COLOR handling
+// cannot drift apart.
+inline constexpr std::array<std::string_view, 4> kTruthyTokens = {
+    "1", "TRUE", "YES", "ON"};
+inline constexpr std::array<std::string_view, 4> kFalsyTokens = {
+    "0", "FALSE", "NO", "OFF"};
+
+inline bool contains_token(std::string_view upperValue,
+                           const std::array<std::string_view, 4>& tokens) {
+    for (const auto token : tokens)
+        if (upperValue == token)
+            return true;
+    return false;
+}
+
+inline bool is_truthy_token(std::string_view upperValue) {
+    return contains_token(upperValue, kTruthyTokens);
+}
+
+inline bool is_falsy_token(std::string_view upperValue) {
+    return contains_token(upperValue, kFalsyTokens);
+}
 
 std::string lowercase(std::string s);
 std::string trim(const std::string& s);

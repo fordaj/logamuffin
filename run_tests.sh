@@ -28,8 +28,9 @@ NATIVE_BIN="build/debug/logamuffin"
 EXECUTABLE=""
 
 # Translation units (split from the former 1955-line logamuffin.cpp).
-SOURCES=(logamuffin.cpp text_utils.cpp json_parser.cpp color.cpp
+SOURCES=(logamuffin.cpp logamuffin_core.cpp text_utils.cpp json_parser.cpp color.cpp
          log_levels.cpp config.cpp platform.cpp)
+UNIT_SOURCES=(logamuffin_core.cpp text_utils.cpp)
 
 SKIP_UNIT="false"
 SKIP_INTEGRATION="false"
@@ -149,7 +150,7 @@ if [[ "$SKIP_UNIT" != "true" ]]; then
     echo "------------------------------------------------------------"
     mkdir -p "$(dirname "$UNIT_BIN")"
     if "$CXX" "${CXXFLAGS[@]}" -I. -Itools/doctest/v2.5.3 \
-        tests/unit/test_logamuffin.cpp -o "$UNIT_BIN"; then
+        tests/unit/test_logamuffin.cpp "${UNIT_SOURCES[@]}" -o "$UNIT_BIN"; then
         echo "Unit binary: $UNIT_BIN"
         echo
         if "$UNIT_BIN"; then

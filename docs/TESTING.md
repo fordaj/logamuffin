@@ -81,15 +81,14 @@ and `build/debug/<platform>/logamuffin` (where `<platform>` is
 
 ## Architecture
 
-### Testable core: `logamuffin.hpp`
+### Testable core: `logamuffin.hpp` + `logamuffin_core.cpp`
 
 The executable originally kept all logic in an anonymous namespace
 inside `logamuffin.cpp`, which made the pure logic untestable without
 subprocess indirection.
 
-To keep the change minimal, the pure helpers moved to a header-only
-core module, `logamuffin.hpp` (`namespace logamuffin`, all functions
-`inline`):
+The pure helpers live in a compiled core module (`namespace logamuffin`,
+declarations in `logamuffin.hpp`, definitions in `logamuffin_core.cpp`):
 
 - `Level`, `LevelInfo`, `levels` and `info()` — severity model.
 - `uppercase()`, `basename()` — string helpers.
@@ -108,8 +107,9 @@ TTY detection, terminal width, locked file append, `run()`/`main()`) and
 called the core for everything testable. There was **no observable
 behavior change**: same messages, exit codes, streams, and file format.
 
-The unit tests `#include "logamuffin.hpp"` directly, so they exercise
-the exact code the executable runs.
+The unit tests `#include "logamuffin.hpp"` directly and link
+`logamuffin_core.cpp` + `text_utils.cpp`, so they exercise the exact
+code the executable runs.
 
 ### Modular executable (issue #8)
 
@@ -122,9 +122,11 @@ public header; helpers shared only inside a module stay file-local.
 - `logamuffin.cpp` — thin executable entry: help/usage text, config-aware
   source resolution, `run()` (argument/config wiring, filtering,
   console + file output), and `main()`.
-- `logamuffin.hpp` — testable core (pure helpers, unchanged interface).
+- `logamuffin.hpp` / `logamuffin_core.cpp` — testable core (pure
+  helpers, declarations + compiled definitions).
 - `text_utils.hpp/.cpp` — string helpers (`lowercase`, `trim`,
-  `normalize_key`, `parse_int_strict`, `parse_bool_string`).
+  `normalize_key`, `parse_int_strict`, `parse_bool_string`,
+  truthy/falsy token tables).
 - `json_parser.hpp/.cpp` — self-contained JSON parser (`JsonValue`,
   `JsonParser`, location + scalar helpers). No other internal
   dependencies.
@@ -138,10 +140,10 @@ public header; helpers shared only inside a module stay file-local.
 - `platform.hpp/.cpp` — OS surface (`hostname()`, `terminal()`,
   `terminal_width()`, `append_locked()`).
 
-`build.sh` and `run_tests.sh` compile the `SOURCES` list (all seven
-translation units). There is **no observable behavior change**: same
-messages, exit codes, streams, and file format. Unit tests still only
-need `logamuffin.hpp`.
+`build.sh` and `run_tests.sh` compile the `SOURCES` list (all eight
+translation units, including `logamuffin_core.cpp`). There is **no
+observable behavior change**: same messages, exit codes, streams, and
+file format. Unit tests need `logamuffin.hpp` plus the core sources.
 
 ### Why doctest for unit tests
 
@@ -251,7 +253,8 @@ width; assert with `assertIn` / regex instead.
 ## Layout
 
 ```
-logamuffin.hpp                     testable core (pure helpers)
+logamuffin.hpp                     testable core declarations
+logamuffin_core.cpp                testable core definitions
 logamuffin.cpp                     executable entry (run/main)
 text_utils.hpp/.cpp                string helpers
 json_parser.hpp/.cpp               JSON parser

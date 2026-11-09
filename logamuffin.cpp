@@ -312,7 +312,7 @@ bool should_emit_level(const Config& cfg, const LogLevel& level) {
 // single invocation is self-consistent.
 struct LogContext {
     std::string time;
-    std::string pc;
+    std::string host;
     std::string source;
 };
 
@@ -330,7 +330,7 @@ void emit_console_line(const Config& cfg, const LogLevel& level,
     const int width = terminal(stream) ? terminal_width() : kFullFormatWidth;
 
     const std::string output = format_console_output(
-        ctx.time, ctx.pc, level, ctx.source, message, color, width);
+        ctx.time, ctx.host, level, ctx.source, message, color, width);
 
     std::fwrite(output.data(), 1, output.size(), stream);
     std::fflush(stream);
@@ -361,7 +361,7 @@ int write_file_log(const Config& cfg, const LogLevel& level,
 
     // Construct the complete entry before acquiring the lock.
     const std::string entry =
-        format_file_entry(ctx.time, ctx.pc, level, ctx.source, message);
+        format_file_entry(ctx.time, ctx.host, level, ctx.source, message);
 
     if (!append_locked(file, entry)) {
         std::cerr << "logamuffin: failed to append log file\n";

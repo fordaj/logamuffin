@@ -619,8 +619,7 @@ bool resolve_threshold_and_scalars(
     }
     if (const char* envColor = std::getenv("LOG_COLOR")) {
         const std::string v = uppercase(trim(envColor));
-        cfg.colorEnabled =
-            (v == "1" || v == "TRUE" || v == "YES" || v == "ON");
+        cfg.colorEnabled = is_truthy_token(v);
     }
     if (const char* envLevel = std::getenv("LOG_LEVEL")) {
         const std::string trimmed = trim(envLevel);
