@@ -47,11 +47,6 @@ constexpr std::array<std::string_view, 8> kLevelsKeyAliases = {
     "levels", "categories", "loglevels", "logcategories",
     "leveldefinitions", "leveldefs", "leveldef", "logleveldefinitions"};
 
-// Levels key as accepted inside a JSON document passed via env
-// (a subset of kLevelsKeyAliases; kept separate to preserve behavior).
-constexpr std::array<std::string_view, 4> kEnvLevelsKeyAliases = {
-    "levels", "categories", "loglevels", "logcategories"};
-
 constexpr std::array<std::string_view, 6> kLevelValueFieldAliases = {
     "value", "level", "num", "number", "numeric", "priority"};
 
@@ -72,6 +67,18 @@ bool matches_any(std::string_view normalizedKey,
     return false;
 }
 
+// Level value/color pair supplied by JSON or NAME=VALUE:COLOR entries.
+struct LevelFields {
+    std::optional<int> value;
+    std::optional<std::string> color;
+};
+
+// Threshold from a config file: numeric wins, else name resolved after env load.
+struct ThresholdSpec {
+    std::optional<std::string> name;
+    std::optional<int> number;
+};
+
 // ---------------------------------------------------------------------------
 // Level entry parsing ("NAME=VALUE:COLOR" and friends)
 // ---------------------------------------------------------------------------
@@ -79,8 +86,7 @@ bool matches_any(std::string_view normalizedKey,
 // tried before color forms so numeric strings bind to value, not color.
 
 bool parse_level_entry(const std::string& rawEntry, std::string& outName,
-                       std::optional<int>& outValue,
-                       std::optional<std::string>& outColor,
+                       LevelFields& outFields,
                        std::string& err) {
     const std::string entry = trim(rawEntry);
     if (entry.empty()) {
@@ -108,8 +114,7 @@ bool parse_level_entry(const std::string& rawEntry, std::string& outName,
         err = "invalid log level name '" + trim(namePart) + "'";
         return false;
     }
-    outValue.reset();
-    outColor.reset();
+    outFields = LevelFields{};
     if (restPart.empty())
         return true;
     // VALUE:COLOR form — a second colon separates value from color.
@@ -129,13 +134,13 @@ bool parse_level_entry(const std::string& rawEntry, std::string& outName,
             err = "invalid log level entry '" + entry + "': " + colorErr;
             return false;
         }
-        outValue = value;
-        outColor = escape;
+        outFields.value = value;
+        outFields.color = escape;
         return true;
     }
     // Single trailing token: numeric → value, otherwise → color.
     if (int value = 0; parse_int_strict(restPart, value)) {
-        outValue = value;
+        outFields.value = value;
         return true;
     }
     std::string escape;
@@ -144,7 +149,7 @@ bool parse_level_entry(const std::string& rawEntry, std::string& outName,
         err = "invalid log level entry '" + entry + "': " + colorErr;
         return false;
     }
-    outColor = escape;
+    outFields.color = escape;
     return true;
 }
 
@@ -187,11 +192,9 @@ bool json_to_color(const JsonValue& value, std::string& outEscape,
 }
 
 bool apply_level_object_fields(const JsonValue& objectValue,
-                               std::optional<int>& value,
-                               std::optional<std::string>& colorEscape,
+                               LevelFields& fields,
                                std::string& err) {
-    value.reset();
-    colorEscape.reset();
+    fields = LevelFields{};
     for (const auto& kv : objectValue.objectValue) {
         const std::string key = normalize_key(kv.first);
         if (matches_any(key, kLevelValueFieldAliases)) {
@@ -200,12 +203,12 @@ bool apply_level_object_fields(const JsonValue& objectValue,
                 err = "level value must be an integer";
                 return false;
             }
-            value = intValue;
+            fields.value = intValue;
         } else if (matches_any(key, kColorFieldAliases)) {
             std::string escape;
             if (!json_to_color(kv.second, escape, err))
                 return false;
-            colorEscape = escape;
+            fields.color = escape;
         } else if (key == "name") {
             continue; // name comes from the object key / "name" field
         } else {
@@ -242,13 +245,12 @@ bool apply_named_level_def(Config& cfg, const std::string& name,
         return upsert_level(cfg.levels, name, std::nullopt, escape, err);
     }
     if (def.type == JsonValue::Type::Object) {
-        std::optional<int> intValue;
-        std::optional<std::string> escape;
-        if (!apply_level_object_fields(def, intValue, escape, err)) {
+        LevelFields fields;
+        if (!apply_level_object_fields(def, fields, err)) {
             err = "level '" + name + "': " + err;
             return false;
         }
-        return upsert_level(cfg.levels, name, intValue, escape, err);
+        return upsert_level(cfg.levels, name, fields.value, fields.color, err);
     }
     err = "level '" + name +
           "' must be a number, color string, or object with "
@@ -274,15 +276,13 @@ bool apply_levels_object(Config& cfg, const JsonValue& value,
 bool apply_level_entry_string(Config& cfg, const JsonValue& element,
                               std::string& err) {
     std::string name;
-    std::optional<int> entryValue;
-    std::optional<std::string> entryColor;
+    LevelFields fields;
     std::string entryErr;
-    if (!parse_level_entry(element.stringValue, name, entryValue,
-                           entryColor, entryErr)) {
+    if (!parse_level_entry(element.stringValue, name, fields, entryErr)) {
         err = entryErr;
         return false;
     }
-    return upsert_level(cfg.levels, name, entryValue, entryColor, err);
+    return upsert_level(cfg.levels, name, fields.value, fields.color, err);
 }
 
 // Applies one array object entry ({"name": ..., "value": ..., "color": ...}).
@@ -306,11 +306,10 @@ bool apply_level_entry_object(Config& cfg, const JsonValue& element,
               trim(nameValue->stringValue) + "'";
         return false;
     }
-    std::optional<int> intValue;
-    std::optional<std::string> escape;
-    if (!apply_level_object_fields(element, intValue, escape, err))
+    LevelFields fields;
+    if (!apply_level_object_fields(element, fields, err))
         return false;
-    return upsert_level(cfg.levels, name, intValue, escape, err);
+    return upsert_level(cfg.levels, name, fields.value, fields.color, err);
 }
 
 bool apply_levels_array(Config& cfg, const JsonValue& value,
@@ -347,8 +346,7 @@ bool apply_levels_json(Config& cfg, const JsonValue& value,
 
 // Threshold key: numeric value wins, else name resolved after env load.
 bool apply_threshold_key(const JsonValue& value,
-                         std::optional<std::string>& pendingThresholdName,
-                         std::optional<int>& pendingThresholdNumber,
+                         ThresholdSpec& pending,
                          std::string& err) {
     if (value.type == JsonValue::Type::Number) {
         int intValue = 0;
@@ -356,19 +354,18 @@ bool apply_threshold_key(const JsonValue& value,
             err = "\"level\" must be an integer or a level name";
             return false;
         }
-        pendingThresholdNumber = intValue;
-        pendingThresholdName.reset();
+        pending.number = intValue;
+        pending.name.reset();
         return true;
     }
     if (value.type == JsonValue::Type::String) {
         if (int intValue = 0;
             parse_int_strict(value.stringValue, intValue)) {
-            pendingThresholdNumber = intValue;
-            pendingThresholdName.reset();
+            pending.number = intValue;
+            pending.name.reset();
         } else {
-            pendingThresholdName =
-                uppercase(trim(value.stringValue));
-            pendingThresholdNumber.reset();
+            pending.name = uppercase(trim(value.stringValue));
+            pending.number.reset();
         }
         return true;
     }
@@ -376,62 +373,41 @@ bool apply_threshold_key(const JsonValue& value,
     return false;
 }
 
-bool apply_color_key(Config& cfg, const JsonValue& value, std::string& err) {
-    bool colorValue = false;
-    if (!json_to_bool(value, colorValue, err)) {
-        err = "\"color\": " + err;
-        return false;
-    }
-    cfg.colorEnabled = colorValue;
-    return true;
-}
-
-bool apply_file_key(Config& cfg, const JsonValue& value, std::string& err) {
-    if (value.type != JsonValue::Type::String ||
-        trim(value.stringValue).empty()) {
-        err = "\"file\" must be a non-empty path string";
-        return false;
-    }
-    cfg.logFile = value.stringValue;
-    return true;
-}
-
-bool apply_source_key(Config& cfg, const JsonValue& value, std::string& err) {
-    if (value.type != JsonValue::Type::String ||
-        trim(value.stringValue).empty()) {
-        err = "\"source\" must be a non-empty string";
-        return false;
-    }
-    cfg.source = value.stringValue;
-    return true;
-}
-
 bool apply_file_json(Config& cfg, const JsonValue& root,
-                     std::optional<std::string>& pendingThresholdName,
-                     std::optional<int>& pendingThresholdNumber,
+                     ThresholdSpec& pending,
                      std::string& err) {
     if (!root.isObject()) {
         err = "root must be a JSON object";
         return false;
     }
-    pendingThresholdName.reset();
-    pendingThresholdNumber.reset();
+    pending = ThresholdSpec{};
     for (const auto& kv : root.objectValue) {
         const std::string key = normalize_key(kv.first);
         const JsonValue& value = kv.second;
         if (matches_any(key, kThresholdKeyAliases)) {
-            if (!apply_threshold_key(value, pendingThresholdName,
-                                     pendingThresholdNumber, err))
+            if (!apply_threshold_key(value, pending, err))
                 return false;
         } else if (matches_any(key, kColorSettingKeyAliases)) {
-            if (!apply_color_key(cfg, value, err))
+            bool colorValue = false;
+            if (!json_to_bool(value, colorValue, err)) {
+                err = "\"color\": " + err;
                 return false;
+            }
+            cfg.colorEnabled = colorValue;
         } else if (matches_any(key, kFileKeyAliases)) {
-            if (!apply_file_key(cfg, value, err))
+            if (value.type != JsonValue::Type::String ||
+                trim(value.stringValue).empty()) {
+                err = "\"file\" must be a non-empty path string";
                 return false;
+            }
+            cfg.logFile = value.stringValue;
         } else if (matches_any(key, kSourceKeyAliases)) {
-            if (!apply_source_key(cfg, value, err))
+            if (value.type != JsonValue::Type::String ||
+                trim(value.stringValue).empty()) {
+                err = "\"source\" must be a non-empty string";
                 return false;
+            }
+            cfg.source = value.stringValue;
         } else if (matches_any(key, kLevelsKeyAliases)) {
             if (!apply_levels_json(cfg, value, err))
                 return false;
@@ -482,7 +458,7 @@ bool apply_single_level_list_env(Config& cfg, std::string_view envName,
         if (root.isObject()) {
             for (const auto& kv : root.objectValue) {
                 if (matches_any(normalize_key(kv.first),
-                                kEnvLevelsKeyAliases)) {
+                                kLevelsKeyAliases)) {
                     levels = &kv.second;
                     break;
                 }
@@ -507,15 +483,14 @@ bool apply_single_level_list_env(Config& cfg, std::string_view envName,
         if (entry.empty())
             continue;
         std::string name;
-        std::optional<int> value;
-        std::optional<std::string> colorEscape;
+        LevelFields fields;
         std::string entryErr;
-        if (!parse_level_entry(entry, name, value, colorEscape, entryErr)) {
+        if (!parse_level_entry(entry, name, fields, entryErr)) {
             err = std::string("Invalid ") + std::string(envName) + ": " +
                   entryErr;
             return false;
         }
-        if (!upsert_level(cfg.levels, name, value, colorEscape, err)) {
+        if (!upsert_level(cfg.levels, name, fields.value, fields.color, err)) {
             err = std::string("Invalid ") + std::string(envName) + ": " + err;
             return false;
         }
@@ -606,8 +581,7 @@ bool apply_env_levels(Config& cfg, std::string& err) {
 
 bool resolve_threshold_and_scalars(
     Config& cfg,
-    const std::optional<std::string>& pendingThresholdName,
-    const std::optional<int>& pendingThresholdNumber,
+    const ThresholdSpec& pending,
     std::string& err) {
     if (const char* envFile = std::getenv("LOG_FILE")) {
         if (*envFile)
@@ -642,12 +616,12 @@ bool resolve_threshold_and_scalars(
         cfg.thresholdValue = found->value;
         return true;
     }
-    if (pendingThresholdNumber.has_value()) {
-        cfg.thresholdValue = *pendingThresholdNumber;
+    if (pending.number.has_value()) {
+        cfg.thresholdValue = *pending.number;
         return true;
     }
-    if (pendingThresholdName.has_value()) {
-        const std::string& name = *pendingThresholdName;
+    if (pending.name.has_value()) {
+        const std::string& name = *pending.name;
         if (name == "ALWAYS") {
             err = "Invalid config level: ALWAYS cannot be used as the "
                   "minimum level";
@@ -720,8 +694,7 @@ std::optional<std::string> resolve_config_path(
 
 // Reads and applies the JSON config file at path, if present.
 bool apply_config_file(Config& cfg, const std::string& path,
-                       std::optional<std::string>& pendingThresholdName,
-                       std::optional<int>& pendingThresholdNumber,
+                       ThresholdSpec& pending,
                        std::string& err) {
     std::string content;
     if (!read_config_file(path, content, err))
@@ -735,8 +708,7 @@ bool apply_config_file(Config& cfg, const std::string& path,
               json_location(content, parseErr.pos);
         return false;
     }
-    if (!apply_file_json(cfg, root, pendingThresholdName,
-                         pendingThresholdNumber, err)) {
+    if (!apply_file_json(cfg, root, pending, err)) {
         err = "invalid config file '" + path + "': " + err;
         return false;
     }
@@ -757,20 +729,17 @@ bool load_config(const std::optional<std::string>& cliConfigPath,
     const std::optional<std::string> configPath =
         resolve_config_path(cliConfigPath);
 
-    std::optional<std::string> pendingThresholdName;
-    std::optional<int> pendingThresholdNumber;
+    ThresholdSpec pending;
 
     if (configPath.has_value()) {
-        if (!apply_config_file(cfg, *configPath, pendingThresholdName,
-                               pendingThresholdNumber, err))
+        if (!apply_config_file(cfg, *configPath, pending, err))
             return false;
     }
 
     if (!apply_env_levels(cfg, err))
         return false;
 
-    if (!resolve_threshold_and_scalars(cfg, pendingThresholdName,
-                                       pendingThresholdNumber, err))
+    if (!resolve_threshold_and_scalars(cfg, pending, err))
         return false;
 
     sort_levels(cfg.levels);
