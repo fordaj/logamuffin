@@ -1,9 +1,11 @@
 #include "config.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 #include "color.hpp"
 #include "json_parser.hpp"
@@ -20,7 +22,62 @@ constexpr std::size_t kMaxConfigFileSizeBytes = 4 * 1024 * 1024;
 // Maximum numeric SGR color code accepted via JSON numbers.
 constexpr int kMaxColorCode = 999;
 
-// "NAME=VALUE:COLOR" | "NAME=VALUE" | "NAME=COLOR" | "NAME:VALUE[:COLOR]" ...
+// ---------------------------------------------------------------------------
+// Alias tables (normalized keys from normalize_key())
+// ---------------------------------------------------------------------------
+// Each table lists every accepted spelling for one semantic concept.
+// matches_any() is the single dispatch predicate; adding a spelling
+// means adding one entry here, not editing an if-chain.
+
+constexpr std::array<std::string_view, 6> kThresholdKeyAliases = {
+    "level", "minlevel", "threshold",
+    "loglevel", "minimumlevel", "minloglevel"};
+
+constexpr std::array<std::string_view, 5> kColorSettingKeyAliases = {
+    "color", "colors", "ansi", "colored", "coloroutput"};
+
+constexpr std::array<std::string_view, 7> kFileKeyAliases = {
+    "file", "logfile", "logfilepath", "filepath",
+    "path", "logpath", "fileoutput"};
+
+constexpr std::array<std::string_view, 3> kSourceKeyAliases = {
+    "source", "logsource", "sourcename"};
+
+constexpr std::array<std::string_view, 8> kLevelsKeyAliases = {
+    "levels", "categories", "loglevels", "logcategories",
+    "leveldefinitions", "leveldefs", "leveldef", "logleveldefinitions"};
+
+// Levels key as accepted inside a JSON document passed via env
+// (a subset of kLevelsKeyAliases; kept separate to preserve behavior).
+constexpr std::array<std::string_view, 4> kEnvLevelsKeyAliases = {
+    "levels", "categories", "loglevels", "logcategories"};
+
+constexpr std::array<std::string_view, 6> kLevelValueFieldAliases = {
+    "value", "level", "num", "number", "numeric", "priority"};
+
+constexpr std::array<std::string_view, 5> kColorFieldAliases = {
+    "color", "colour", "ansi", "escape", "code"};
+
+// Level-list env vars in precedence order (later wins).
+constexpr std::array<std::string_view, 4> kLevelListEnvVars = {
+    "LOGAMUFFIN_LEVELS", "LOGAMUFFIN_CATEGORIES",
+    "LOG_CATEGORIES", "LOG_LEVELS"};
+
+template <std::size_t N>
+bool matches_any(std::string_view normalizedKey,
+                 const std::array<std::string_view, N>& aliases) {
+    for (const auto alias : aliases)
+        if (normalizedKey == alias)
+            return true;
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Level entry parsing ("NAME=VALUE:COLOR" and friends)
+// ---------------------------------------------------------------------------
+// Grammar: NAME (=|:) [VALUE[:COLOR] | COLOR | VALUE]. Value forms are
+// tried before color forms so numeric strings bind to value, not color.
+
 bool parse_level_entry(const std::string& rawEntry, std::string& outName,
                        std::optional<int>& outValue,
                        std::optional<std::string>& outColor,
@@ -30,19 +87,21 @@ bool parse_level_entry(const std::string& rawEntry, std::string& outName,
         err = "empty log level entry";
         return false;
     }
-    const std::size_t eq = entry.find('=');
-    const std::size_t colon = entry.find(':');
+    // Split name from rest at the first separator that precedes the other.
+    const std::size_t eqPos = entry.find('=');
+    const std::size_t colonPos = entry.find(':');
     std::string namePart;
-    std::string rest;
-    if (eq != std::string::npos && (colon == std::string::npos || eq < colon)) {
-        namePart = entry.substr(0, eq);
-        rest = trim(entry.substr(eq + 1));
-    } else if (colon != std::string::npos) {
-        namePart = entry.substr(0, colon);
-        rest = trim(entry.substr(colon + 1));
+    std::string restPart;
+    if (eqPos != std::string::npos &&
+        (colonPos == std::string::npos || eqPos < colonPos)) {
+        namePart = entry.substr(0, eqPos);
+        restPart = trim(entry.substr(eqPos + 1));
+    } else if (colonPos != std::string::npos) {
+        namePart = entry.substr(0, colonPos);
+        restPart = trim(entry.substr(colonPos + 1));
     } else {
         namePart = entry;
-        rest = "";
+        restPart = "";
     }
     outName = uppercase(trim(namePart));
     if (!valid_level_name(outName)) {
@@ -51,21 +110,22 @@ bool parse_level_entry(const std::string& rawEntry, std::string& outName,
     }
     outValue.reset();
     outColor.reset();
-    if (rest.empty())
+    if (restPart.empty())
         return true;
-    const std::size_t colon2 = rest.find(':');
-    if (colon2 != std::string::npos) {
-        const std::string left = trim(rest.substr(0, colon2));
-        const std::string right = trim(rest.substr(colon2 + 1));
+    // VALUE:COLOR form — a second colon separates value from color.
+    if (const std::size_t secondColon = restPart.find(':');
+        secondColon != std::string::npos) {
+        const std::string valuePart = trim(restPart.substr(0, secondColon));
+        const std::string colorPart = trim(restPart.substr(secondColon + 1));
         int value = 0;
-        if (!parse_int_strict(left, value) || right.empty()) {
+        if (!parse_int_strict(valuePart, value) || colorPart.empty()) {
             err = "invalid log level entry '" + entry +
                   "' (expected NAME=VALUE:COLOR)";
             return false;
         }
         std::string escape;
         std::string colorErr;
-        if (!resolve_color(right, escape, colorErr)) {
+        if (!resolve_color(colorPart, escape, colorErr)) {
             err = "invalid log level entry '" + entry + "': " + colorErr;
             return false;
         }
@@ -73,20 +133,24 @@ bool parse_level_entry(const std::string& rawEntry, std::string& outName,
         outColor = escape;
         return true;
     }
-    int value = 0;
-    if (parse_int_strict(rest, value)) {
+    // Single trailing token: numeric → value, otherwise → color.
+    if (int value = 0; parse_int_strict(restPart, value)) {
         outValue = value;
         return true;
     }
     std::string escape;
     std::string colorErr;
-    if (!resolve_color(rest, escape, colorErr)) {
+    if (!resolve_color(restPart, escape, colorErr)) {
         err = "invalid log level entry '" + entry + "': " + colorErr;
         return false;
     }
     outColor = escape;
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// JSON scalar helpers
+// ---------------------------------------------------------------------------
 
 bool json_to_bool(const JsonValue& value, bool& out, std::string& err) {
     if (value.type == JsonValue::Type::Bool) {
@@ -130,16 +194,14 @@ bool apply_level_object_fields(const JsonValue& objectValue,
     colorEscape.reset();
     for (const auto& kv : objectValue.objectValue) {
         const std::string key = normalize_key(kv.first);
-        if (key == "value" || key == "level" || key == "num" ||
-            key == "number" || key == "numeric" || key == "priority") {
+        if (matches_any(key, kLevelValueFieldAliases)) {
             int intValue = 0;
             if (!json_scalar_to_int(kv.second, intValue)) {
                 err = "level value must be an integer";
                 return false;
             }
             value = intValue;
-        } else if (key == "color" || key == "colour" || key == "ansi" ||
-                   key == "escape" || key == "code") {
+        } else if (matches_any(key, kColorFieldAliases)) {
             std::string escape;
             if (!json_to_color(kv.second, escape, err))
                 return false;
@@ -153,112 +215,195 @@ bool apply_level_object_fields(const JsonValue& objectValue,
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Levels JSON (object form and array form)
+// ---------------------------------------------------------------------------
+
+// Applies one named level definition (number, string, or object).
+bool apply_named_level_def(Config& cfg, const std::string& name,
+                           const JsonValue& def, std::string& err) {
+    if (def.type == JsonValue::Type::Number) {
+        int intValue = 0;
+        if (!json_number_to_int(def, intValue)) {
+            err = "level '" + name + "' value must be an integer";
+            return false;
+        }
+        return upsert_level(cfg.levels, name, intValue, std::nullopt, err);
+    }
+    if (def.type == JsonValue::Type::String) {
+        if (int intValue = 0; parse_int_strict(def.stringValue, intValue)) {
+            return upsert_level(cfg.levels, name, intValue, std::nullopt, err);
+        }
+        std::string escape;
+        if (!resolve_color(def.stringValue, escape, err)) {
+            err = "level '" + name + "': " + err;
+            return false;
+        }
+        return upsert_level(cfg.levels, name, std::nullopt, escape, err);
+    }
+    if (def.type == JsonValue::Type::Object) {
+        std::optional<int> intValue;
+        std::optional<std::string> escape;
+        if (!apply_level_object_fields(def, intValue, escape, err)) {
+            err = "level '" + name + "': " + err;
+            return false;
+        }
+        return upsert_level(cfg.levels, name, intValue, escape, err);
+    }
+    err = "level '" + name +
+          "' must be a number, color string, or object with "
+          "\"value\"/\"color\"";
+    return false;
+}
+
+bool apply_levels_object(Config& cfg, const JsonValue& value,
+                         std::string& err) {
+    for (const auto& kv : value.objectValue) {
+        const std::string name = uppercase(trim(kv.first));
+        if (!valid_level_name(name)) {
+            err = "invalid log level name '" + trim(kv.first) + "'";
+            return false;
+        }
+        if (!apply_named_level_def(cfg, name, kv.second, err))
+            return false;
+    }
+    return true;
+}
+
+// Applies one array string entry ("NAME=VALUE:COLOR").
+bool apply_level_entry_string(Config& cfg, const JsonValue& element,
+                              std::string& err) {
+    std::string name;
+    std::optional<int> entryValue;
+    std::optional<std::string> entryColor;
+    std::string entryErr;
+    if (!parse_level_entry(element.stringValue, name, entryValue,
+                           entryColor, entryErr)) {
+        err = entryErr;
+        return false;
+    }
+    return upsert_level(cfg.levels, name, entryValue, entryColor, err);
+}
+
+// Applies one array object entry ({"name": ..., "value": ..., "color": ...}).
+bool apply_level_entry_object(Config& cfg, const JsonValue& element,
+                              std::string& err) {
+    const JsonValue* nameValue = nullptr;
+    for (const auto& kv : element.objectValue) {
+        if (normalize_key(kv.first) == "name") {
+            nameValue = &kv.second;
+            break;
+        }
+    }
+    if (!nameValue || nameValue->type != JsonValue::Type::String) {
+        err = "level object is missing a string \"name\"";
+        return false;
+    }
+    const std::string name =
+        uppercase(trim(nameValue->stringValue));
+    if (!valid_level_name(name)) {
+        err = "invalid log level name '" +
+              trim(nameValue->stringValue) + "'";
+        return false;
+    }
+    std::optional<int> intValue;
+    std::optional<std::string> escape;
+    if (!apply_level_object_fields(element, intValue, escape, err))
+        return false;
+    return upsert_level(cfg.levels, name, intValue, escape, err);
+}
+
+bool apply_levels_array(Config& cfg, const JsonValue& value,
+                        std::string& err) {
+    for (const auto& element : value.arrayValue) {
+        if (element.type == JsonValue::Type::String) {
+            if (!apply_level_entry_string(cfg, element, err))
+                return false;
+        } else if (element.type == JsonValue::Type::Object) {
+            if (!apply_level_entry_object(cfg, element, err))
+                return false;
+        } else {
+            err = "levels array entries must be strings or objects "
+                  "with \"name\"/\"value\"/\"color\"";
+            return false;
+        }
+    }
+    return true;
+}
+
 bool apply_levels_json(Config& cfg, const JsonValue& value,
                        std::string& err) {
-    if (value.type == JsonValue::Type::Object) {
-        for (const auto& kv : value.objectValue) {
-            const std::string name = uppercase(trim(kv.first));
-            if (!valid_level_name(name)) {
-                err = "invalid log level name '" + trim(kv.first) + "'";
-                return false;
-            }
-            const JsonValue& def = kv.second;
-            if (def.type == JsonValue::Type::Number) {
-                int intValue = 0;
-                if (!json_number_to_int(def, intValue)) {
-                    err = "level '" + name +
-                          "' value must be an integer";
-                    return false;
-                }
-                if (!upsert_level(cfg.levels, name, intValue,
-                                  std::nullopt, err))
-                    return false;
-            } else if (def.type == JsonValue::Type::String) {
-                int intValue = 0;
-                if (parse_int_strict(def.stringValue, intValue)) {
-                    if (!upsert_level(cfg.levels, name, intValue,
-                                      std::nullopt, err))
-                        return false;
-                } else {
-                    std::string escape;
-                    if (!resolve_color(def.stringValue, escape, err)) {
-                        err = "level '" + name + "': " + err;
-                        return false;
-                    }
-                    if (!upsert_level(cfg.levels, name, std::nullopt,
-                                      escape, err))
-                        return false;
-                }
-            } else if (def.type == JsonValue::Type::Object) {
-                std::optional<int> intValue;
-                std::optional<std::string> escape;
-                if (!apply_level_object_fields(def, intValue, escape, err)) {
-                    err = "level '" + name + "': " + err;
-                    return false;
-                }
-                if (!upsert_level(cfg.levels, name, intValue, escape, err))
-                    return false;
-            } else {
-                err = "level '" + name +
-                      "' must be a number, color string, or object with "
-                      "\"value\"/\"color\"";
-                return false;
-            }
-        }
-        return true;
-    }
-    if (value.type == JsonValue::Type::Array) {
-        for (const auto& element : value.arrayValue) {
-            if (element.type == JsonValue::Type::String) {
-                std::string name;
-                std::optional<int> entryValue;
-                std::optional<std::string> entryColor;
-                std::string entryErr;
-                if (!parse_level_entry(element.stringValue, name,
-                                       entryValue, entryColor, entryErr)) {
-                    err = entryErr;
-                    return false;
-                }
-                if (!upsert_level(cfg.levels, name, entryValue,
-                                  entryColor, err))
-                    return false;
-            } else if (element.type == JsonValue::Type::Object) {
-                const JsonValue* nameValue = nullptr;
-                for (const auto& kv : element.objectValue) {
-                    if (normalize_key(kv.first) == "name") {
-                        nameValue = &kv.second;
-                        break;
-                    }
-                }
-                if (!nameValue ||
-                    nameValue->type != JsonValue::Type::String) {
-                    err = "level object is missing a string \"name\"";
-                    return false;
-                }
-                const std::string name =
-                    uppercase(trim(nameValue->stringValue));
-                if (!valid_level_name(name)) {
-                    err = "invalid log level name '" +
-                          trim(nameValue->stringValue) + "'";
-                    return false;
-                }
-                std::optional<int> intValue;
-                std::optional<std::string> escape;
-                if (!apply_level_object_fields(element, intValue, escape,
-                                               err))
-                    return false;
-                if (!upsert_level(cfg.levels, name, intValue, escape, err))
-                    return false;
-            } else {
-                err = "levels array entries must be strings or objects "
-                      "with \"name\"/\"value\"/\"color\"";
-                return false;
-            }
-        }
-        return true;
-    }
+    if (value.type == JsonValue::Type::Object)
+        return apply_levels_object(cfg, value, err);
+    if (value.type == JsonValue::Type::Array)
+        return apply_levels_array(cfg, value, err);
     err = "\"levels\" must be an object or array";
     return false;
+}
+
+// ---------------------------------------------------------------------------
+// Config file JSON (top-level keys)
+// ---------------------------------------------------------------------------
+
+// Threshold key: numeric value wins, else name resolved after env load.
+bool apply_threshold_key(const JsonValue& value,
+                         std::optional<std::string>& pendingThresholdName,
+                         std::optional<int>& pendingThresholdNumber,
+                         std::string& err) {
+    if (value.type == JsonValue::Type::Number) {
+        int intValue = 0;
+        if (!json_number_to_int(value, intValue)) {
+            err = "\"level\" must be an integer or a level name";
+            return false;
+        }
+        pendingThresholdNumber = intValue;
+        pendingThresholdName.reset();
+        return true;
+    }
+    if (value.type == JsonValue::Type::String) {
+        if (int intValue = 0;
+            parse_int_strict(value.stringValue, intValue)) {
+            pendingThresholdNumber = intValue;
+            pendingThresholdName.reset();
+        } else {
+            pendingThresholdName =
+                uppercase(trim(value.stringValue));
+            pendingThresholdNumber.reset();
+        }
+        return true;
+    }
+    err = "\"level\" must be an integer or a level name";
+    return false;
+}
+
+bool apply_color_key(Config& cfg, const JsonValue& value, std::string& err) {
+    bool colorValue = false;
+    if (!json_to_bool(value, colorValue, err)) {
+        err = "\"color\": " + err;
+        return false;
+    }
+    cfg.colorEnabled = colorValue;
+    return true;
+}
+
+bool apply_file_key(Config& cfg, const JsonValue& value, std::string& err) {
+    if (value.type != JsonValue::Type::String ||
+        trim(value.stringValue).empty()) {
+        err = "\"file\" must be a non-empty path string";
+        return false;
+    }
+    cfg.logFile = value.stringValue;
+    return true;
+}
+
+bool apply_source_key(Config& cfg, const JsonValue& value, std::string& err) {
+    if (value.type != JsonValue::Type::String ||
+        trim(value.stringValue).empty()) {
+        err = "\"source\" must be a non-empty string";
+        return false;
+    }
+    cfg.source = value.stringValue;
+    return true;
 }
 
 bool apply_file_json(Config& cfg, const JsonValue& root,
@@ -274,61 +419,20 @@ bool apply_file_json(Config& cfg, const JsonValue& root,
     for (const auto& kv : root.objectValue) {
         const std::string key = normalize_key(kv.first);
         const JsonValue& value = kv.second;
-        if (key == "level" || key == "minlevel" || key == "threshold" ||
-            key == "loglevel" || key == "minimumlevel" ||
-            key == "minloglevel") {
-            if (value.type == JsonValue::Type::Number) {
-                int intValue = 0;
-                if (!json_number_to_int(value, intValue)) {
-                    err = "\"level\" must be an integer or a level name";
-                    return false;
-                }
-                pendingThresholdNumber = intValue;
-                pendingThresholdName.reset();
-            } else if (value.type == JsonValue::Type::String) {
-                int intValue = 0;
-                if (parse_int_strict(value.stringValue, intValue)) {
-                    pendingThresholdNumber = intValue;
-                    pendingThresholdName.reset();
-                } else {
-                    pendingThresholdName =
-                        uppercase(trim(value.stringValue));
-                    pendingThresholdNumber.reset();
-                }
-            } else {
-                err = "\"level\" must be an integer or a level name";
+        if (matches_any(key, kThresholdKeyAliases)) {
+            if (!apply_threshold_key(value, pendingThresholdName,
+                                     pendingThresholdNumber, err))
                 return false;
-            }
-        } else if (key == "color" || key == "colors" || key == "ansi" ||
-                   key == "colored" || key == "coloroutput") {
-            bool colorValue = false;
-            if (!json_to_bool(value, colorValue, err)) {
-                err = "\"color\": " + err;
+        } else if (matches_any(key, kColorSettingKeyAliases)) {
+            if (!apply_color_key(cfg, value, err))
                 return false;
-            }
-            cfg.colorEnabled = colorValue;
-        } else if (key == "file" || key == "logfile" ||
-                   key == "logfilepath" || key == "filepath" ||
-                   key == "path" || key == "logpath" ||
-                   key == "fileoutput") {
-            if (value.type != JsonValue::Type::String ||
-                trim(value.stringValue).empty()) {
-                err = "\"file\" must be a non-empty path string";
+        } else if (matches_any(key, kFileKeyAliases)) {
+            if (!apply_file_key(cfg, value, err))
                 return false;
-            }
-            cfg.logFile = value.stringValue;
-        } else if (key == "source" || key == "logsource" ||
-                   key == "sourcename") {
-            if (value.type != JsonValue::Type::String ||
-                trim(value.stringValue).empty()) {
-                err = "\"source\" must be a non-empty string";
+        } else if (matches_any(key, kSourceKeyAliases)) {
+            if (!apply_source_key(cfg, value, err))
                 return false;
-            }
-            cfg.source = value.stringValue;
-        } else if (key == "levels" || key == "categories" ||
-                   key == "loglevels" || key == "logcategories" ||
-                   key == "leveldefinitions" || key == "leveldefs" ||
-                   key == "leveldef" || key == "logleveldefinitions") {
+        } else if (matches_any(key, kLevelsKeyAliases)) {
             if (!apply_levels_json(cfg, value, err))
                 return false;
         } else {
@@ -337,6 +441,10 @@ bool apply_file_json(Config& cfg, const JsonValue& root,
     }
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// Environment overrides (level lists + per-category vars)
+// ---------------------------------------------------------------------------
 
 std::vector<std::string> split_level_list(const std::string& raw) {
     std::vector<std::string> entries;
@@ -353,73 +461,83 @@ std::vector<std::string> split_level_list(const std::string& raw) {
     return entries;
 }
 
-bool apply_env_levels(Config& cfg, std::string& err) {
-    // LOGAMUFFIN_* aliases, then LOG_CATEGORIES, then LOG_LEVELS wins.
-    for (const char* envName : {"LOGAMUFFIN_LEVELS",
-                                "LOGAMUFFIN_CATEGORIES",
-                                "LOG_CATEGORIES", "LOG_LEVELS"}) {
-        const char* raw = std::getenv(envName);
-        if (!raw || !*raw)
-            continue;
-        const std::string trimmedRaw = trim(raw);
-        // A JSON object/array is accepted as an alternative to the
-        // comma-separated NAME=VALUE:COLOR list.
-        if (!trimmedRaw.empty() &&
-            (trimmedRaw.front() == '{' || trimmedRaw.front() == '[')) {
-            JsonParser parser(trimmedRaw);
-            JsonValue root;
-            JsonParseError parseErr;
-            if (!parser.parse(root, parseErr)) {
-                err = std::string("Invalid ") + envName + ": " +
-                      parseErr.message + " at " +
-                      json_location(trimmedRaw, parseErr.pos);
-                return false;
-            }
-            if (root.isObject()) {
-                const JsonValue* levels = nullptr;
-                for (const auto& kv : root.objectValue) {
-                    const std::string key = normalize_key(kv.first);
-                    if (key == "levels" || key == "categories" ||
-                        key == "loglevels" || key == "logcategories") {
-                        levels = &kv.second;
-                        break;
-                    }
-                }
-                if (levels) {
-                    if (!apply_levels_json(cfg, *levels, err)) {
-                        err = std::string("Invalid ") + envName + ": " + err;
-                        return false;
-                    }
-                    continue;
-                }
-            }
-            if (!apply_levels_json(cfg, root, err)) {
-                err = std::string("Invalid ") + envName + ": " + err;
-                return false;
-            }
-            continue;
+// Applies one env var that holds either a comma list or a JSON doc.
+bool apply_single_level_list_env(Config& cfg, std::string_view envName,
+                                 const char* raw, std::string& err) {
+    const std::string trimmedRaw = trim(raw);
+    // A JSON object/array is accepted as an alternative to the
+    // comma-separated NAME=VALUE:COLOR list.
+    if (!trimmedRaw.empty() &&
+        (trimmedRaw.front() == '{' || trimmedRaw.front() == '[')) {
+        JsonParser parser(trimmedRaw);
+        JsonValue root;
+        JsonParseError parseErr;
+        if (!parser.parse(root, parseErr)) {
+            err = std::string("Invalid ") + std::string(envName) + ": " +
+                  parseErr.message + " at " +
+                  json_location(trimmedRaw, parseErr.pos);
+            return false;
         }
-        for (const auto& entryRaw : split_level_list(raw)) {
-            const std::string entry = trim(entryRaw);
-            if (entry.empty())
-                continue;
-            std::string name;
-            std::optional<int> value;
-            std::optional<std::string> colorEscape;
-            std::string entryErr;
-            if (!parse_level_entry(entry, name, value, colorEscape,
-                                   entryErr)) {
-                err = std::string("Invalid ") + envName + ": " + entryErr;
-                return false;
+        const JsonValue* levels = nullptr;
+        if (root.isObject()) {
+            for (const auto& kv : root.objectValue) {
+                if (matches_any(normalize_key(kv.first),
+                                kEnvLevelsKeyAliases)) {
+                    levels = &kv.second;
+                    break;
+                }
             }
-            if (!upsert_level(cfg.levels, name, value, colorEscape, err)) {
-                err = std::string("Invalid ") + envName + ": " + err;
-                return false;
+            if (levels) {
+                if (!apply_levels_json(cfg, *levels, err)) {
+                    err = std::string("Invalid ") + std::string(envName) +
+                          ": " + err;
+                    return false;
+                }
+                return true;
             }
+        }
+        if (!apply_levels_json(cfg, root, err)) {
+            err = std::string("Invalid ") + std::string(envName) + ": " + err;
+            return false;
+        }
+        return true;
+    }
+    for (const auto& entryRaw : split_level_list(raw)) {
+        const std::string entry = trim(entryRaw);
+        if (entry.empty())
+            continue;
+        std::string name;
+        std::optional<int> value;
+        std::optional<std::string> colorEscape;
+        std::string entryErr;
+        if (!parse_level_entry(entry, name, value, colorEscape, entryErr)) {
+            err = std::string("Invalid ") + std::string(envName) + ": " +
+                  entryErr;
+            return false;
+        }
+        if (!upsert_level(cfg.levels, name, value, colorEscape, err)) {
+            err = std::string("Invalid ") + std::string(envName) + ": " + err;
+            return false;
         }
     }
-    // Per-category overrides: LOG_LEVEL_VALUE_<NAME> / LOG_LEVEL_COLOR_<NAME>
-    // (and the LOG_LEVEL_<NAME>_VALUE / _COLOR spellings).
+    return true;
+}
+
+bool apply_env_level_lists(Config& cfg, std::string& err) {
+    for (const auto envName : kLevelListEnvVars) {
+        const std::string envNameStr(envName);
+        const char* raw = std::getenv(envNameStr.c_str());
+        if (!raw || !*raw)
+            continue;
+        if (!apply_single_level_list_env(cfg, envName, raw, err))
+            return false;
+    }
+    return true;
+}
+
+// Per-category overrides: LOG_LEVEL_VALUE_<NAME> / LOG_LEVEL_COLOR_<NAME>
+// (and the LOG_LEVEL_<NAME>_VALUE / _COLOR spellings).
+bool apply_env_per_category_overrides(Config& cfg, std::string& err) {
     std::vector<std::string> names;
     for (const auto& level : cfg.levels)
         names.push_back(level.name);
@@ -470,9 +588,21 @@ bool apply_env_levels(Config& cfg, std::string& err) {
             break;
         }
     }
+    return true;
+}
+
+bool apply_env_levels(Config& cfg, std::string& err) {
+    if (!apply_env_level_lists(cfg, err))
+        return false;
+    if (!apply_env_per_category_overrides(cfg, err))
+        return false;
     sort_levels(cfg.levels);
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// Threshold + scalar resolution (env wins over file over defaults)
+// ---------------------------------------------------------------------------
 
 bool resolve_threshold_and_scalars(
     Config& cfg,
@@ -537,6 +667,10 @@ bool resolve_threshold_and_scalars(
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Config file IO
+// ---------------------------------------------------------------------------
+
 bool read_config_file(const std::string& path, std::string& content,
                       std::string& err) {
     std::error_code ec;
@@ -565,6 +699,52 @@ bool read_config_file(const std::string& path, std::string& content,
     return true;
 }
 
+// Resolves the winning config path: explicit --config, then
+// LOG_CONFIG/LOGAMUFFIN_CONFIG, then ./.logamuffin autodiscovery.
+std::optional<std::string> resolve_config_path(
+    const std::optional<std::string>& cliConfigPath) {
+    if (cliConfigPath.has_value())
+        return *cliConfigPath;
+    if (const char* envConfig = std::getenv("LOG_CONFIG")) {
+        if (*envConfig)
+            return std::string(envConfig);
+    }
+    if (const char* envConfig = std::getenv("LOGAMUFFIN_CONFIG")) {
+        if (*envConfig)
+            return std::string(envConfig);
+    }
+    std::error_code ec;
+    if (std::filesystem::exists(".logamuffin", ec))
+        return std::string(".logamuffin");
+    return std::nullopt;
+}
+
+// Reads and applies the JSON config file at path, if present.
+bool apply_config_file(Config& cfg, const std::string& path,
+                       std::optional<std::string>& pendingThresholdName,
+                       std::optional<int>& pendingThresholdNumber,
+                       std::string& err) {
+    std::string content;
+    if (!read_config_file(path, content, err))
+        return false;
+    JsonParser parser(content);
+    JsonValue root;
+    JsonParseError parseErr;
+    if (!parser.parse(root, parseErr)) {
+        err = "invalid config file '" + path + "': " +
+              parseErr.message + " at " +
+              json_location(content, parseErr.pos);
+        return false;
+    }
+    if (!apply_file_json(cfg, root, pendingThresholdName,
+                         pendingThresholdNumber, err)) {
+        err = "invalid config file '" + path + "': " + err;
+        return false;
+    }
+    sort_levels(cfg.levels);
+    return true;
+}
+
 } // namespace
 
 bool load_config(const std::optional<std::string>& cliConfigPath,
@@ -575,44 +755,16 @@ bool load_config(const std::optional<std::string>& cliConfigPath,
     cfg.logFile.reset();
     cfg.source.reset();
 
-    std::optional<std::string> configPath;
-    if (cliConfigPath.has_value()) {
-        configPath = *cliConfigPath;
-    } else if (const char* envConfig = std::getenv("LOG_CONFIG")) {
-        if (*envConfig)
-            configPath = std::string(envConfig);
-    } else if (const char* envConfig =
-                   std::getenv("LOGAMUFFIN_CONFIG")) {
-        if (*envConfig)
-            configPath = std::string(envConfig);
-    } else {
-        std::error_code ec;
-        if (std::filesystem::exists(".logamuffin", ec))
-            configPath = ".logamuffin";
-    }
+    const std::optional<std::string> configPath =
+        resolve_config_path(cliConfigPath);
 
     std::optional<std::string> pendingThresholdName;
     std::optional<int> pendingThresholdNumber;
 
     if (configPath.has_value()) {
-        std::string content;
-        if (!read_config_file(*configPath, content, err))
+        if (!apply_config_file(cfg, *configPath, pendingThresholdName,
+                               pendingThresholdNumber, err))
             return false;
-        JsonParser parser(content);
-        JsonValue root;
-        JsonParseError parseErr;
-        if (!parser.parse(root, parseErr)) {
-            err = "invalid config file '" + *configPath + "': " +
-                  parseErr.message + " at " +
-                  json_location(content, parseErr.pos);
-            return false;
-        }
-        if (!apply_file_json(cfg, root, pendingThresholdName,
-                             pendingThresholdNumber, err)) {
-            err = "invalid config file '" + *configPath + "': " + err;
-            return false;
-        }
-        sort_levels(cfg.levels);
     }
 
     if (!apply_env_levels(cfg, err))
