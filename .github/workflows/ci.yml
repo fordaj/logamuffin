@@ -28,24 +28,67 @@ jobs:
     runs-on: ${{ matrix.labels }}
     timeout-minutes: 15
     steps:
-      # Formatting does not need git history; keep the checkout shallow and
-      # fast. (The test job needs fetch-depth: 0 for version.hpp.)
-      - uses: actions/checkout@v7
+      # Full clone always (mirror-clone/git clone); the test job below
+      # needs git tags for version.hpp.
+      # Clone the repo with mirror-clone when available; fall back to
+      # git clone otherwise (or if mirror-clone fails). A full clone is
+      # required for the git-tag-derived version checks.
+      - name: Clone Repo
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          rm -rf "$GITHUB_WORKSPACE"
+          mkdir -p "$GITHUB_WORKSPACE"
+          if command -v mirror-clone >/dev/null 2>&1; then
+            echo "using mirror-clone"
+            mirror-clone --branch "$branch" \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+              "$GITHUB_WORKSPACE" || {
+                echo "mirror-clone failed; falling back to git clone"
+                rm -rf "$GITHUB_WORKSPACE"
+                mkdir -p "$GITHUB_WORKSPACE"
+                git clone --branch "$branch" \
+                  "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+                  "$GITHUB_WORKSPACE"
+              }
+          else
+            echo "mirror-clone not installed; using git clone"
+            git clone --branch "$branch" \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+              "$GITHUB_WORKSPACE"
+          fi
 
       # uv for the Python side (formattington via uv run). uv also
       # fetches CPython 3.14 on first use.
       - uses: astral-sh/setup-uv@v7
 
-      # node + npm for prettier only. clang-format is installed via uv
+      # node + pnpm for prettier only. clang-format is installed via uv
       # (PyPI wheel) below — the npm clang-format package does not
       # understand newer .clang-format options (e.g. InsertBraces).
       - uses: actions/setup-node@v7
         with:
           node-version: 22
 
+      # prettier (pnpm) — matches the PATH-only requirement in format.bash.
+      - name: Install pnpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10 --activate
+
       - name: Install prettier
         shell: bash
-        run: npm install --global prettier
+        run: |
+          set -euo pipefail
+          PNPM_HOME="$HOME/pnpm"
+          mkdir -p "$PNPM_HOME"
+          pnpm config set global-bin-dir "$PNPM_HOME"
+          pnpm add --global prettier
+          echo "$PNPM_HOME" >> "$GITHUB_PATH"
 
       # clang-format via the PyPI wheel (>=18). The npm clang-format
       # package is pinned to old libclang releases and chokes on modern
@@ -99,9 +142,36 @@ jobs:
     runs-on: [self-hosted, macOS]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
+      # Clone the repo with mirror-clone when available; fall back to
+      # git clone otherwise (or if mirror-clone fails). A full clone is
+      # required for the git-tag-derived version checks.
+      - name: Clone Repo
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          rm -rf "$GITHUB_WORKSPACE"
+          mkdir -p "$GITHUB_WORKSPACE"
+          if command -v mirror-clone >/dev/null 2>&1; then
+            echo "using mirror-clone"
+            mirror-clone --branch "$branch" \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+              "$GITHUB_WORKSPACE" || {
+                echo "mirror-clone failed; falling back to git clone"
+                rm -rf "$GITHUB_WORKSPACE"
+                mkdir -p "$GITHUB_WORKSPACE"
+                git clone --branch "$branch" \
+                  "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+                  "$GITHUB_WORKSPACE"
+              }
+          else
+            echo "mirror-clone not installed; using git clone"
+            git clone --branch "$branch" \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+              "$GITHUB_WORKSPACE"
+          fi
       - name: Run test suite
         shell: bash
         run: ./run_tests.sh
