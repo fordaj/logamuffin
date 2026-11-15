@@ -173,7 +173,7 @@ log INFO "Application started"
 log DEBUG "Loading configuration"
 ```
 
-The copy-paste function (also shipped as [`log.sh`](log.sh) at the repository root — source that file to get the identical behavior):
+The copy-paste function (also shipped as `log.sh` at the repository root — source that file, documented in [log.md](log.md), to get the identical behavior):
 
 ```bash
 log() {
@@ -210,7 +210,7 @@ log() {
 
 Tip: point `LOGAMUFFIN_BIN` at a build output when `logamuffin` is not on `PATH` (the demo and tests use the debug build under `build/debug/logamuffin`). The helper is Bash-only; in Zsh capture the call site with `${(%):-%N}` / `$LINENO` instead of `BASH_SOURCE`/`FUNCNAME`.
 
-![Demo](image.png)
+![Demo](https://raw.githubusercontent.com/fordaj/logamuffin/main/image.png)
 
 Run `./demo.sh` to see every capability above in action in one
 visual pass (version/help, levels and colors, numeric levels,
@@ -563,8 +563,12 @@ Logamuffin aims to be a small, dependable utility that does one thing well.
 
 It's intended for shell scripts and standalone automation, not as a replacement for every application's specialized logging framework.
 
+## Documentation
+
+Every source file has a sibling Markdown page documenting it, rendered into a static site with [barnacle](https://github.com/fordaj/barnacle). See [AGENTS.md](AGENTS.md) for the documentation map and conventions, and run `scripts/docs.sh` to generate the site (output in `./site/`, git-ignored).
+
 ## License
 
-See [LICENSE](LICENSE) for licensing information.
+See `LICENSE` for licensing information.
 
 ---
