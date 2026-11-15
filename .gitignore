@@ -50,7 +50,7 @@ dist
 *.out
 *.app
 # ... except bundled Versioner binaries (tools/versioner/update.bash).
-!tools/versioner/**/*.exe
+!tools/**/*.exe
 
 # Build directories
 build/
