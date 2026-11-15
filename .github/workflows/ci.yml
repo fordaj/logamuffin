@@ -39,6 +39,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # Leave the workspace before deleting it: git cannot run from
+          # a cwd that no longer exists.
+          cd "${RUNNER_TEMP:-/tmp}"
           branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           rm -rf "$GITHUB_WORKSPACE"
           mkdir -p "$GITHUB_WORKSPACE"
@@ -151,6 +154,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # Leave the workspace before deleting it: git cannot run from
+          # a cwd that no longer exists.
+          cd "${RUNNER_TEMP:-/tmp}"
           branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           rm -rf "$GITHUB_WORKSPACE"
           mkdir -p "$GITHUB_WORKSPACE"
