@@ -1,5 +1,18 @@
 # The barnacle bundle (`tools/barnacle/`)
 
+```mermaid
+flowchart LR
+    Up[update.sh] --> Tag{resolve tag<br/>latest release or --tag}
+    Tag --> DL["gh release download"]
+    DL --> Sum{checksums.txt<br/>shipped?}
+    Sum -->|yes| Verify["verify SHA256"]
+    Sum -->|no| Warn["warn, keep going"]
+    Verify --> Stage["stage into v…/platform/<br/>binary + LICENSE"]
+    Warn --> Stage
+    Stage --> Swap["swap in,<br/>remove superseded"]
+    Swap --> Smoke["host binary reports<br/>its version"]
+```
+
 [Barnacle](https://github.com/fordaj/barnacle) is a documentation-site generator: it renders the `.md` and `.mmd` files scattered through a repository into a static, navigable HTML site. This repository uses it to render *this* documentation; the site you may be reading was built by it.
 
 ## Layout
@@ -16,7 +29,7 @@ tools/barnacle/
     windows-x86_64/barnacle.exe
 ```
 
-Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v0.0.1.0.17` in `scripts/.common.env`; selected via `BARNACLE_BIN` in the platform env files (see [../../scripts/env.md](../../scripts/env.md)).
+Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v0.0.1.0.17` in `scripts/.common.env`; selected via `BARNACLE_BIN` in the platform env files (see [../../scripts/env.sh.md](../../scripts/env.sh.md)).
 
 ## `update.sh` in detail
 
@@ -31,10 +44,10 @@ Flags: `--dry-run` lists the assets without touching anything; `--tag TAG` pins 
 
 ## How the repository uses it
 
-[scripts/docs.md](../../scripts/docs.md) resolves `BARNACLE_BIN` through the [env cascade](../../scripts/env.md) and generates `./site/` from the repo root; the output is git-ignored.
+[scripts/docs.sh.md](../../scripts/docs.sh.md) resolves `BARNACLE_BIN` through the [env cascade](../../scripts/env.sh.md) and generates `./site/` from the repo root; the output is git-ignored.
 
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
-- [../../scripts/docs.md](../../scripts/docs.md) — the docs generator that runs this binary
+- [../../scripts/docs.sh.md](../../scripts/docs.sh.md) — the docs generator that runs this binary
 - [../../scripts/README.md](../../scripts/README.md) — the scripts that consume the bundle

@@ -1,5 +1,18 @@
 # The formattington-lite bundle (`tools/formattington-lite/`)
 
+```mermaid
+flowchart LR
+    Up[update.sh] --> Tag{resolve tag<br/>latest release or --tag}
+    Tag --> DL["gh release download"]
+    DL --> Sum{checksums.txt<br/>shipped?}
+    Sum -->|yes| Verify["verify SHA256"]
+    Sum -->|no| Warn["warn, keep going"]
+    Verify --> Stage["stage into v…/platform/<br/>binary + LICENSE"]
+    Warn --> Stage
+    Stage --> Swap["swap in,<br/>remove superseded"]
+    Swap --> Smoke["host binary reports<br/>its version"]
+```
+
 [Formattington](https://github.com/fordaj/formattington) is the formatter orchestrator (prettier, clang-format, shfmt and friends) used by this repository's `format.sh`/`ci/format_check.sh` — via the `pyproject.toml`/`uv.lock` Python pin, not this bundle. The `formattington-lite` bundle is a slim prebuilt binary kept in the repo for direct invocation; it is **not** wired into the environment cascade (`scripts/.common.env` pins only versioner, logamuffin, runner-spawner, and barnacle).
 
 ## Layout
@@ -32,5 +45,5 @@ Flags: `--dry-run`, `--tag TAG`, `--repo REPO`. Environment overrides: `FORMATTI
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
-- [../../format.md](../../scripts/format.md) — the formatting workflow (pinned via uv, not this bundle)
+- [../../format.sh.md](../../scripts/format.sh.md) — the formatting workflow (pinned via uv, not this bundle)
 - [../../scripts/README.md](../../scripts/README.md)

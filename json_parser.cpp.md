@@ -1,6 +1,18 @@
 # JSON parser (`json_parser.cpp` + `json_parser.hpp`)
 
-`json_parser.md` documents `json_parser.cpp` and `json_parser.hpp`. A minimal, dependency-free JSON reader used for `.logamuffin` config files. Config semantics live in [config.md](config.md); this module only produces a `JsonValue` tree.
+```mermaid
+flowchart TD
+    Text[.logamuffin text] --> Bom["strip BOM,<br/>allow comments + trailing commas"]
+    Bom --> RD["JsonParser<br/>recursive descent · depth-limited"]
+    RD -->|malformed| Err["JsonParseError<br/>message + byte offset"]
+    RD -->|valid| Tree[JsonValue tree]
+    Tree --> Find["JsonValue::find(key)"]
+    Tree --> Num["json_number_to_int()"]
+    Tree --> Loc["json_location()<br/>offset → line:column"]
+    click Tree href "config.cpp.md"
+```
+
+`json_parser.cpp.md` documents `json_parser.cpp` and `json_parser.hpp`. A minimal, dependency-free JSON reader used for `.logamuffin` config files. Config semantics live in [config.cpp.md](config.cpp.md); this module only produces a `JsonValue` tree.
 
 ## Interface
 
@@ -22,10 +34,10 @@ Recursive-descent, depth-limited parser supporting objects, arrays, strings (wit
 
 ## Where it is used
 
-[config.md](config.md) is the only consumer: it parses the selected config file and walks the resulting tree (`levels` as object or array, aliased top-level keys). Nothing else in the binary reads JSON.
+[config.cpp.md](config.cpp.md) is the only consumer: it parses the selected config file and walks the resulting tree (`levels` as object or array, aliased top-level keys). Nothing else in the binary reads JSON.
 
 ## Related pages
 
-- [config.md](config.md) — the only caller; maps `JsonValue` onto `Config`
-- [text_utils.md](text_utils.md) — shares `hex_digit_value()` with the parser
-- [logamuffin.md](logamuffin.md)
+- [config.cpp.md](config.cpp.md) — the only caller; maps `JsonValue` onto `Config`
+- [text_utils.cpp.md](text_utils.cpp.md) — shares `hex_digit_value()` with the parser
+- [logamuffin.cpp.md](logamuffin.cpp.md)

@@ -1,5 +1,18 @@
 # The versioner bundle (`tools/versioner/`)
 
+```mermaid
+flowchart LR
+    Up[update.sh] --> Tag{resolve tag<br/>latest release or --tag}
+    Tag --> DL["gh release download"]
+    DL --> Sum{checksums.txt<br/>shipped?}
+    Sum -->|yes| Verify["verify SHA256"]
+    Sum -->|no| Warn["warn, keep going"]
+    Verify --> Stage["stage into v…/platform/<br/>binary + LICENSE"]
+    Warn --> Stage
+    Stage --> Swap["swap in,<br/>remove superseded"]
+    Swap --> Smoke["host binary reports<br/>its version"]
+```
+
 [Versioner](https://github.com/fordaj/Versioner) derives a five-part version (`branch.major.minor.revision.patch`) from git history. This repository uses it to stamp every build: `scripts/build.sh`, `run_tests.sh`, `tools/generate_version.sh`, and `scripts/release.sh` all call the bundled binary so `--version` always reflects `HEAD`. `.versioner.json` configures the scheme (main exempt to branch-version `0`, other branches to `254`). See "Versioning" in [../../README.md](../../README.md) for the full story (`.version/version.hpp`, `LOGAMUFFIN_VERSION`, `LOGAMUFFIN_VERSION_TAG`).
 
 ## Layout
@@ -17,7 +30,7 @@ tools/versioner/
 
 Note: no `windows-arm64` bundle exists upstream — `scripts/.windows-arm64.env` points `VERSIONER_BIN` at the `windows-x86_64` build and documents overriding it with a versioner on `PATH`.
 
-Pinned as `VERSIONER_VERSION_DIR=tools/versioner/v0.0.3.0.5` in `scripts/.common.env`; selected via `VERSIONER_BIN` in the platform env files (see [../../scripts/env.md](../../scripts/env.md)).
+Pinned as `VERSIONER_VERSION_DIR=tools/versioner/v0.0.3.0.5` in `scripts/.common.env`; selected via `VERSIONER_BIN` in the platform env files (see [../../scripts/env.sh.md](../../scripts/env.sh.md)).
 
 ## `update.sh` in detail
 
@@ -33,6 +46,6 @@ Flags: `--dry-run`, `--tag TAG`, `--repo REPO`. Environment overrides: `VERSIONE
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
-- [../generate_version.md](../generate_version.md) — what consumes this binary to write `.version/version.hpp`
-- [../../scripts/version.md](../../scripts/version.md) — read-only version printing
-- [../../scripts/release.md](../../scripts/release.md) — releases tagged with this version
+- [../generate_version.sh.md](../generate_version.sh.md) — what consumes this binary to write `.version/version.hpp`
+- [../../scripts/version.sh.md](../../scripts/version.sh.md) — read-only version printing
+- [../../scripts/release.sh.md](../../scripts/release.sh.md) — releases tagged with this version

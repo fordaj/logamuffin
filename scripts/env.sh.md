@@ -1,5 +1,22 @@
 # The environment cascade (`scripts/env.sh` + the hidden `.*.env` files)
 
+```mermaid
+flowchart TD
+    Env[env.sh] --> Locate["locate cascade<br/>BASH_SOURCE / zsh eval"]
+    Locate --> Common[".common.env<br/>versions + slugs"]
+    Common --> Plat{"uname -s / uname -m"}
+    Plat --> LA[.linux-arm64.env]
+    Plat --> LX[.linux-x86_64.env]
+    Plat --> MA[.macos-arm64.env]
+    Plat --> MX[.macos-x86_64.env]
+    Plat --> WA[.windows-arm64.env]
+    Plat --> WX[.windows-x86_64.env]
+    Plat -->|unsupported| Fail["stderr + return 1"]
+    LA --> Anchor[anchor *_BIN to REPO_ROOT_DIR]
+    MA --> Anchor
+    WA --> Anchor
+```
+
 `scripts/env.sh` is the plumbing that makes the pinned helper tools resolvable from any script, in any working directory, on every supported platform. It is sourced — never executed — and it works from both bash and zsh.
 
 ## What it does
@@ -7,7 +24,7 @@
 1. Locates the cascade files relative to itself (bash via `$BASH_SOURCE`, zsh via `$ZSH_VERSION` with an `eval` so POSIX parsers never see the `${(%):-%x}` syntax) so sourcing works from any cwd.
 2. Brings in `.common.env`, then the platform file selected by `uname -s`/`uname -m` — for example `.macos-arm64.env` or `.windows-x86_64.env` (Windows matched via `MINGW*`/`MSYS*`/`CYGWIN*`). Unsupported platforms print an error to stderr and return `1`.
 3. **Anchors** every repository-relative `*_BIN` to the repository root (`REPO_ROOT_DIR`), leaving absolute paths untouched. After sourcing, `$VERSIONER_BIN`, `$LOGAMUFFIN_BIN`, `$RUNNER_SPAWNER_BIN`, and `$BARNACLE_BIN` are absolute.
-4. Sets `REPO_ROOT_DIR` for callers that need the repository root (for example [version.md](version.md)).
+4. Sets `REPO_ROOT_DIR` for callers that need the repository root (for example [version.sh.md](version.sh.md)).
 
 Everything is exported with `set -a` while sourcing and un-exported afterwards, so the cascade does not leak into the caller's environment beyond the intended variables.
 
@@ -20,6 +37,6 @@ Hidden files are excluded from barnacle's default scan, so their contract is doc
 
 ## Related pages
 
-- [entry.md](entry.md) — the entry point most scripts source (it loads this file and defines `log()`)
-- [docs.md](docs.md) — the docs generator that resolves `BARNACLE_BIN` through this cascade
-- [../tools/README.md](../tools/README.md) — the bundles selected by the `*_BIN` variables
+- [entry.sh.md](entry.sh.md) — the entry point most scripts source (it loads this file and defines `log()`)
+- [docs.sh.md](docs.sh.md) — the docs generator that resolves `BARNACLE_BIN` through this cascade
+- `tools/README.md` — the bundles selected by the `*_BIN` variables

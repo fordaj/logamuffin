@@ -1,5 +1,15 @@
 # Formatting in place (`scripts/format.sh`)
 
+```mermaid
+flowchart LR
+    Fmt[format.sh] --> UV["uv run formattington all"]
+    UV --> Md["prettier<br/>markdown"]
+    UV --> Cpp["clang-format<br/>c · h · cpp · hpp"]
+    UV --> Sh["shfmt -i 4<br/>shell"]
+    UV --> Scope[".formattington.json +<br/>.clang-format / .prettierrc"]
+    Ci["ci/format_check.sh — check-only"] --> UV
+```
+
 `scripts/format.sh` formats the whole repository with [formattington](https://github.com/fordaj/formattington): Markdown via prettier, C/C++ via clang-format, shell via `shfmt -i 4`, as scoped by `.formattington.json` and styled by `.clang-format`/`.prettierrc`. The vendored header under `tools/doctest/` is skipped (as are `build/` and other generated locations).
 
 ## Usage

@@ -1,5 +1,18 @@
 # Translation-unit list (`tools/sources.sh`)
 
+```mermaid
+flowchart LR
+    S[sources.sh] --> Src["SOURCES<br/>8 translation units"]
+    S --> Unit["UNIT_SOURCES<br/>3 pure-logic units"]
+    S --> CXX["CXX / CXXFLAGS<br/>dev and test builds"]
+    Src --> Build["build.sh<br/>6 release targets"]
+    Unit --> UnitBin["run_tests.sh<br/>doctest unit binary"]
+    Src --> DevBin["run_tests.sh<br/>fresh dev binary"]
+    click Build href "../scripts/build.sh.md"
+    click UnitBin href "../scripts/run_tests.sh.md"
+    click DevBin href "../scripts/run_tests.sh.md"
+```
+
 `tools/sources.sh` is the single source of truth for which translation units make up the `logamuffin` binary and which subset the unit tests need. It is sourced — never executed — by `scripts/build.sh` and `run_tests.sh`, so adding a module means editing one list.
 
 ## What it defines
@@ -13,10 +26,10 @@ Header-only `ansi_colors.hpp` needs no entry (every TU includes it directly). Th
 
 ## Where it is used
 
-[../scripts/build.md](../scripts/build.md) (`SOURCES`), [../run_tests.md](../scripts/run_tests.md) (`SOURCES`, `UNIT_SOURCES`, `CXX`, `CXXFLAGS`).
+[../scripts/build.sh.md](../scripts/build.sh.md) (`SOURCES`), [../run_tests.sh.md](../scripts/run_tests.sh.md) (`SOURCES`, `UNIT_SOURCES`, `CXX`, `CXXFLAGS`).
 
 ## Related pages
 
-- [../run_tests.md](../scripts/run_tests.md) — test builds
-- [../scripts/build.md](../scripts/build.md) — cross-compiled release builds
-- [../logamuffin.md](../logamuffin.md) — what the units implement
+- [../run_tests.sh.md](../scripts/run_tests.sh.md) — test builds
+- [../scripts/build.sh.md](../scripts/build.sh.md) — cross-compiled release builds
+- [../logamuffin.cpp.md](../logamuffin.cpp.md) — what the units implement

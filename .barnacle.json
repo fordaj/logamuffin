@@ -1,0 +1,4 @@
+{
+  "title": "logamuffin",
+  "exclude": ["tools", "dist", "build", "agents"]
+}

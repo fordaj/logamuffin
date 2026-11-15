@@ -1,5 +1,18 @@
 # The logamuffin bundle (`tools/logamuffin/`)
 
+```mermaid
+flowchart LR
+    Up[update.sh] --> Tag{resolve tag<br/>latest release or --tag}
+    Tag --> DL["gh release download"]
+    DL --> Sum{checksums.txt<br/>shipped?}
+    Sum -->|yes| Verify["verify SHA256"]
+    Sum -->|no| Warn["warn, keep going"]
+    Verify --> Stage["stage into v…/platform/<br/>binary + LICENSE"]
+    Warn --> Stage
+    Stage --> Swap["swap in,<br/>remove superseded"]
+    Swap --> Smoke["host binary reports<br/>its version"]
+```
+
 [Logamuffin](https://github.com/fordaj/logamuffin) is the structured logging backend: a small C++20 binary used by this repository's tooling via `scripts/entry.sh`'s `log()` (and by the fordaj ecosystem more broadly — this repository is logamuffin's source). This bundle is the prebuilt upstream binary, distinct from the `logamuffin` built from this tree.
 
 ## Layout
@@ -14,7 +27,7 @@ tools/logamuffin/
 
 `scripts/.common.env` pins `LOGAMUFFIN_VERSION_DIR=tools/logamuffin/v0.1.3.0.35` and the platform env files point `LOGAMUFFIN_BIN` at it. Only `update.sh` is tracked in git — the v0.1.3.0.35 binaries are absent from this checkout, so `scripts/entry.sh`'s `log()` currently falls back to printf until the bundle is fetched. (The `.gitignore` does not exclude them; they simply have not been committed/fetched here.)
 
-Pinned as `LOGAMUFFIN v0.1.3.0.35`; see [../../scripts/env.md](../../scripts/env.md).
+Pinned as `LOGAMUFFIN v0.1.3.0.35`; see [../../scripts/env.sh.md](../../scripts/env.sh.md).
 
 ## `update.sh` in detail
 
@@ -29,10 +42,10 @@ Flags: `--dry-run`, `--tag TAG`, `--repo REPO`. Environment overrides: `LOGAMUFF
 
 ## How the repository uses it
 
-`log()` in [../../scripts/entry.sh](../../scripts/entry.md) forwards to `$LOGAMUFFIN_BIN` when it is executable; `log.sh` at the repo root (the user-facing Bash helper, see [../../log.md](../../scripts/log.md)) resolves `LOGAMUFFIN_BIN` or falls back to PATH/build outputs.
+`log()` in [../../scripts/entry.sh](../../scripts/entry.sh.md) forwards to `$LOGAMUFFIN_BIN` when it is executable; `log.sh` at the repo root (the user-facing Bash helper, see [../../log.sh.md](../../scripts/log.sh.md)) resolves `LOGAMUFFIN_BIN` or falls back to PATH/build outputs.
 
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
-- [../../scripts/entry.md](../../scripts/entry.md) — the `log()` that consumes this binary
-- [../../scripts/env.md](../../scripts/env.md) — cascade and pins
+- [../../scripts/entry.sh.md](../../scripts/entry.sh.md) — the `log()` that consumes this binary
+- [../../scripts/env.sh.md](../../scripts/env.sh.md) — cascade and pins

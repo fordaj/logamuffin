@@ -1,5 +1,15 @@
 # Testing Logamuffin
 
+```mermaid
+flowchart LR
+    RT[run_tests.sh] --> Unit["unit binary<br/>doctest"]
+    RT --> Int["integration suite<br/>python3 unittest"]
+    Unit --> U["tests/unit/test_logamuffin.cpp<br/>against logamuffin_core.cpp"]
+    Int --> I["tests/integration/test_cli.py<br/>against a fresh dev binary"]
+    click RT href "../scripts/run_tests.sh.md"
+    click U href "../logamuffin.cpp.md"
+```
+
 Logamuffin has two test suites that together cover correctness, CLI
 behavior, and cross-platform compatibility — without adding any runtime
 dependency for Logamuffin users.

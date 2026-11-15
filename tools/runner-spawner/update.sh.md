@@ -1,5 +1,18 @@
 # The runner-spawner bundle (`tools/runner-spawner/`)
 
+```mermaid
+flowchart LR
+    Up[update.sh] --> Tag{resolve tag<br/>latest release or --tag}
+    Tag --> DL["gh release download"]
+    DL --> Sum{checksums.txt<br/>shipped?}
+    Sum -->|yes| Verify["verify SHA256"]
+    Sum -->|no| Warn["warn, keep going"]
+    Verify --> Stage["stage into v…/platform/<br/>binary + LICENSE"]
+    Warn --> Stage
+    Stage --> Swap["swap in,<br/>remove superseded"]
+    Swap --> Smoke["host binary reports<br/>its version"]
+```
+
 [runner-spawner](https://github.com/fordaj/runner-spawner) manages self-hosted CI runners. This repository uses it to manage the runners its GitHub Actions workflow (`.github/workflows/ci.yml`) runs on; runner configuration lives in `.runner-spawner.json` (`fordaj/logamuffin`, runners `runner01`/`runner02`, group `Default`, runner version `2.338.2`, state dir `.runners/`).
 
 ## Layout
@@ -16,7 +29,7 @@ tools/runner-spawner/
     windows-x86_64/runner-spawner.exe
 ```
 
-Pinned as `RUNNER_SPAWNER_VERSION_DIR=tools/runner-spawner/v0.0.1.2.6` in `scripts/.common.env`; selected via `RUNNER_SPAWNER_BIN` in the platform env files (see [../../scripts/env.md](../../scripts/env.md)). Note: runner-spawner reports unsupported on Linux (macOS + Windows only) — the Linux binaries ship for a uniform layout but `scripts/.linux-*.env` records that caveat.
+Pinned as `RUNNER_SPAWNER_VERSION_DIR=tools/runner-spawner/v0.0.1.2.6` in `scripts/.common.env`; selected via `RUNNER_SPAWNER_BIN` in the platform env files (see [../../scripts/env.sh.md](../../scripts/env.sh.md)). Note: runner-spawner reports unsupported on Linux (macOS + Windows only) — the Linux binaries ship for a uniform layout but `scripts/.linux-*.env` records that caveat.
 
 ## `update.sh` in detail
 
@@ -32,5 +45,5 @@ Flags: `--dry-run`, `--tag TAG`, `--repo REPO`. Environment overrides: `RUNNER_S
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
-- [../../scripts/env.md](../../scripts/env.md) — cascade and pins
+- [../../scripts/env.sh.md](../../scripts/env.sh.md) — cascade and pins
 - [../../README.md](../../README.md) — "Continuous integration" section
