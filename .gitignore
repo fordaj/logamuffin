@@ -90,3 +90,9 @@ __pycache__/
 
 # Generated version header (fordaj/Versioner via tools/generate_version.bash)
 .version/
+
+# Self-hosted runners (.runner-spawner.json)
+.runners/
+
+# Tool logs
+.logs/

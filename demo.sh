@@ -36,7 +36,7 @@ resolve_logger() {
         return 0
     fi
 
-    # Platform build from ./build.sh (build/release|debug/<platform>/).
+    # Platform build from scripts/build.sh (build/release|debug/<platform>/).
     local platform
     case "$(uname -s):$(uname -m)" in
     Darwin:x86_64)
@@ -85,7 +85,7 @@ resolve_logger() {
 
 if ! LOGGER="$(resolve_logger)"; then
     echo "ERROR: Logamuffin not found on PATH or in expected build directory." >&2
-    echo "Build it with ./build.sh, or ./run_tests.sh for a native build, or install it on PATH." >&2
+    echo "Build it with scripts/build.sh, or ./run_tests.sh for a native build, or install it on PATH." >&2
     exit 1
 fi
 
