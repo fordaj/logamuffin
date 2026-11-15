@@ -7,9 +7,18 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+# Cancel superseded runs on the same ref (pushes to a PR branch re-trigger
+# CI; old runs are cancelled).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   check-formatting:
-    name: Check Formatting
+    name: Check Formatting (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -17,23 +26,35 @@ jobs:
           - { os: macOS, labels: [self-hosted, macOS] }
           - { os: Windows, labels: [self-hosted, Windows] }
     runs-on: ${{ matrix.labels }}
+    timeout-minutes: 15
     steps:
+      # Formatting does not need git history; keep the checkout shallow and
+      # fast. (The test job needs fetch-depth: 0 for version.hpp.)
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       # uv for the Python side (formattington via uv run). uv also
       # fetches CPython 3.14 on first use.
       - uses: astral-sh/setup-uv@v7
 
-      # node + npm for the PATH-only formatter CLIs (prettier, clang-format).
+      # node + npm for prettier only. clang-format is installed via uv
+      # (PyPI wheel) below — the npm clang-format package does not
+      # understand newer .clang-format options (e.g. InsertBraces).
       - uses: actions/setup-node@v7
         with:
           node-version: 22
 
-      - name: Install prettier and clang-format
+      - name: Install prettier
         shell: bash
-        run: npm install --global prettier clang-format
+        run: npm install --global prettier
+
+      # clang-format via the PyPI wheel (>=18). The npm clang-format
+      # package is pinned to old libclang releases and chokes on modern
+      # .clang-format options; the official wheel tracks upstream.
+      - name: Install clang-format
+        shell: bash
+        run: |
+          uv tool install 'clang-format>=18'
+          echo "$(uv tool dir --bin)" >> "$GITHUB_PATH"
 
       # shfmt — pinned release, installed into a scratch bin dir.
       - name: Install shfmt
@@ -71,9 +92,12 @@ jobs:
 
   test:
     name: Test (macOS)
-    # The build system is Unix shell + clang++/Zig; the Windows runner only
-    # provides the formatting gate for now (zip packaging covers releases).
+    # The build system is Unix shell + clang++/Zig. The Windows runner only
+    # provides the formatting gate for now (the suite needs a Unix-ish
+    # toolchain; zip packaging covers releases). fetch-depth: 0 is required
+    # because .version/version.hpp is generated from git tags.
     runs-on: [self-hosted, macOS]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
