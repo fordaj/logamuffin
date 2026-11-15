@@ -26,7 +26,7 @@ tools/<name>/
 | [barnacle](barnacle/update.md) | Renders this documentation site | [update.sh](barnacle/update.md) |
 | [formattington-lite](formattington-lite/update.md) | Slim formattington bundle (all platforms committed) | [update.sh](formattington-lite/update.md) |
 
-Pins currently named by `scripts/.common.env`: `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v0.1.3.0.35`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v0.0.1.0.5` (formattington-lite is pinned by its own version directory, `tools/formattington-lite/v0.0.2.0.53/`, and is not wired into the environment cascade). Note that `tools/logamuffin/` currently ships only `update.sh` in git — the `v0.1.3.0.35` binaries referenced by the cascade are not committed, so the tooling `log()` falls back to printf until the bundle is refreshed.
+Pins currently named by `scripts/.common.env`: `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v0.1.3.0.35`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v0.0.1.0.17` (formattington-lite is pinned by its own version directory, `tools/formattington-lite/v0.0.2.0.53/`, and is not wired into the environment cascade). Note that `tools/logamuffin/` currently ships only `update.sh` in git — the `v0.1.3.0.35` binaries referenced by the cascade are not committed, so the tooling `log()` falls back to printf until the bundle is refreshed.
 
 `<platform>` archives are native (`.tar.gz` on macOS/Linux, `.zip` on Windows); there is no 7zip dependency unless a legacy release ships `.7z` assets (still accepted as a fallback).
 

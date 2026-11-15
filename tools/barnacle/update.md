@@ -7,7 +7,7 @@
 ```text
 tools/barnacle/
   update.sh                     # refresh from fordaj/barnacle releases
-  v0.0.1.0.5/
+  v0.0.1.0.17/
     macos-arm64/barnacle
     macos-x86_64/barnacle
     linux-arm64/barnacle
@@ -16,7 +16,7 @@ tools/barnacle/
     windows-x86_64/barnacle.exe
 ```
 
-Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v0.0.1.0.5` in `scripts/.common.env`; selected via `BARNACLE_BIN` in the platform env files (see [../../scripts/env.md](../../scripts/env.md)).
+Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v0.0.1.0.17` in `scripts/.common.env`; selected via `BARNACLE_BIN` in the platform env files (see [../../scripts/env.md](../../scripts/env.md)).
 
 ## `update.sh` in detail
 
