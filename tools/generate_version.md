@@ -17,7 +17,7 @@ Prerequisites: `git` (versioner shells out to it) and a bundled versioner binary
 
 Environment: `VERSIONER_BIN` (prebuilt binary override), `OUTPUT_DIR` (default `<root>/.version`). Unknown arguments exit 2; validation failures exit 1.
 
-Called by [../scripts/build.md](../scripts/build.md), [../scripts/release.md](../scripts/release.md), and [../run_tests.md](../run_tests.md) — all regenerate before building, so the header and binary never disagree.
+Called by [../scripts/build.md](../scripts/build.md), [../scripts/release.md](../scripts/release.md), and [../run_tests.md](../scripts/run_tests.md) — all regenerate before building, so the header and binary never disagree.
 
 ## Related pages
 

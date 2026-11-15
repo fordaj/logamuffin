@@ -8,7 +8,7 @@ terminating the whole suite (via unittest), unlike a Bash script with
 `set -e`.
 
 How to run:
-    # Against the native build produced by ./run_tests.sh
+    # Against the native build produced by ./scripts/run_tests.sh
     python3 tests/integration/test_cli.py --executable build/debug/logamuffin
 
     # Against any explicit binary (e.g. a release archive on PATH)
@@ -16,14 +16,14 @@ How to run:
     LOG_BIN=/path/to/logamuffin python3 -m unittest tests.integration.test_cli -v
 
     # Or via the single entry point
-    ./run_tests.sh
+    ./scripts/run_tests.sh
 
 Each test runs in an isolated temporary directory (created fresh in
 setUp and removed via addCleanup) and explicitly sets LOG_FILE /
 LOG_COLOR / LOG_LEVEL / LOG_SOURCE, so host environment variables can
 never leak into results.
 
-This suite preserves the coverage of the legacy Bash test.sh and adds
+This suite preserves the coverage of the legacy Bash scripts/test.sh and adds
 the missing cases from issue #6: argument validation, severity aliases,
 environment defaults/overrides/invalid values, stdout/stderr routing,
 file creation/appending/error handling, ANSI behavior, multiline and
@@ -166,7 +166,7 @@ class LogamuffinTestCase(unittest.TestCase):
     def setUp(self) -> None:
         if EXE is None or not EXE.is_file():
             self.fail(
-                "logamuffin executable not found. Build it with ./run_tests.sh "
+                "logamuffin executable not found. Build it with ./scripts/run_tests.sh "
                 "or point LOG_BIN / --executable at a binary, e.g. "
                 "python3 tests/integration/test_cli.py --executable build/debug/logamuffin"
             )
@@ -734,11 +734,11 @@ class TestExitCodes(LogamuffinTestCase):
 
 @unittest.skipUnless(shutil.which("bash"), "bash required for log helper tests")
 class TestLogHelper(LogamuffinTestCase):
-    """Bash `log` helper from log.sh forwards and sets LOG_SOURCE (issue #2)."""
+    """Bash `log` helper from scripts/log.sh forwards and sets LOG_SOURCE (issue #2)."""
 
     def _run_script(self, script: str, **env_overrides: str | None) -> subprocess.CompletedProcess:
-        helper = REPO_ROOT / "log.sh"
-        self.assertTrue(helper.is_file(), "log.sh missing at repo root")
+        helper = REPO_ROOT / "scripts/log.sh"
+        self.assertTrue(helper.is_file(), "scripts/log.sh missing at repo root")
         script_path = self.dir / "script.sh"
         script_path.write_text(script, encoding="utf-8")
         env = self.base_env(**env_overrides)
@@ -843,7 +843,7 @@ def _main() -> None:
     if EXE is None or not EXE.is_file():
         print(
             "ERROR: logamuffin executable not found.\n"
-            "Build it with ./run_tests.sh or pass "
+            "Build it with ./scripts/run_tests.sh or pass "
             "--executable <path> / LOG_BIN=<path>.",
             file=sys.stderr,
         )

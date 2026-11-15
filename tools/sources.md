@@ -13,10 +13,10 @@ Header-only `ansi_colors.hpp` needs no entry (every TU includes it directly). Th
 
 ## Where it is used
 
-[../scripts/build.md](../scripts/build.md) (`SOURCES`), [../run_tests.md](../run_tests.md) (`SOURCES`, `UNIT_SOURCES`, `CXX`, `CXXFLAGS`).
+[../scripts/build.md](../scripts/build.md) (`SOURCES`), [../run_tests.md](../scripts/run_tests.md) (`SOURCES`, `UNIT_SOURCES`, `CXX`, `CXXFLAGS`).
 
 ## Related pages
 
-- [../run_tests.md](../run_tests.md) — test builds
+- [../run_tests.md](../scripts/run_tests.md) — test builds
 - [../scripts/build.md](../scripts/build.md) — cross-compiled release builds
 - [../logamuffin.md](../logamuffin.md) — what the units implement

@@ -32,5 +32,5 @@ Flags: `--dry-run`, `--tag TAG`, `--repo REPO`. Environment overrides: `FORMATTI
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
-- [../../format.md](../../format.md) — the formatting workflow (pinned via uv, not this bundle)
+- [../../format.md](../../scripts/format.md) — the formatting workflow (pinned via uv, not this bundle)
 - [../../scripts/README.md](../../scripts/README.md)

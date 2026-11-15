@@ -29,7 +29,7 @@ Flags: `--dry-run`, `--tag TAG`, `--repo REPO`. Environment overrides: `LOGAMUFF
 
 ## How the repository uses it
 
-`log()` in [../../scripts/entry.sh](../../scripts/entry.md) forwards to `$LOGAMUFFIN_BIN` when it is executable; `log.sh` at the repo root (the user-facing Bash helper, see [../../log.md](../../log.md)) resolves `LOGAMUFFIN_BIN` or falls back to PATH/build outputs.
+`log()` in [../../scripts/entry.sh](../../scripts/entry.md) forwards to `$LOGAMUFFIN_BIN` when it is executable; `log.sh` at the repo root (the user-facing Bash helper, see [../../log.md](../../scripts/log.md)) resolves `LOGAMUFFIN_BIN` or falls back to PATH/build outputs.
 
 ## Related pages
 

@@ -23,6 +23,6 @@ tools/doctest/
 
 ## Related pages
 
-- [../../run_tests.md](../../run_tests.md) — builds and runs the unit suite
+- [../../run_tests.md](../../scripts/run_tests.md) — builds and runs the unit suite
 - [../sources.md](../sources.md) — `UNIT_SOURCES` linked into the unit binary
 - [../README.md](../README.md) — the tools index

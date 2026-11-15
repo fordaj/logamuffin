@@ -13,7 +13,7 @@ BUILD_MODE=debug scripts/build.sh
 BUILD_MODE=release scripts/build.sh
 ```
 
-Consumers: `scripts/release.sh` builds release targets through this script; [../demo.md](../demo.md) and `log.sh` look for binaries under `build/<mode>/<platform>/`.
+Consumers: `scripts/release.sh` builds release targets through this script; [../demo.md](demo.md) and `scripts/log.sh` look for binaries under `build/<mode>/<platform>/`.
 
 ## Outputs
 

@@ -12,7 +12,7 @@ dependency for Logamuffin users.
 There is **one command** to run everything:
 
 ```bash
-./run_tests.sh
+./scripts/run_tests.sh
 ```
 
 ## Quick start
@@ -21,9 +21,9 @@ There is **one command** to run everything:
 
 - A C++ compiler with C++20 support (defaults to `clang++`, falls back to `c++`).
 - Python 3 (standard library only — no `pip install` needed).
-- Bash (the `run_tests.sh` entry point is POSIX; the integration suite itself is cross-platform).
+- Bash (the `scripts/run_tests.sh` entry point is POSIX; the integration suite itself is cross-platform).
 - `git` and the bundled Versioner binary under `tools/versioner/`
-  (`run_tests.sh` regenerates `.version/version.hpp` from git history
+  (`scripts/run_tests.sh` regenerates `.version/version.hpp` from git history
   via `tools/generate_version.sh` before compiling; the `.version/`
   directory is git-ignored).
 
@@ -33,7 +33,7 @@ No other dependencies. The doctest header is already vendored at
 ### Run everything
 
 ```bash
-./run_tests.sh
+./scripts/run_tests.sh
 ```
 
 This builds:
@@ -50,15 +50,15 @@ stopping the suite.
 ### Useful variants
 
 ```bash
-./run_tests.sh --skip-unit          # integration only
-./run_tests.sh --skip-integration   # unit only
-./run_tests.sh --verbose            # verbose integration output
-./run_tests.sh --clean              # drop previous test build outputs first
-./run_tests.sh --help
+./scripts/run_tests.sh --skip-unit          # integration only
+./scripts/run_tests.sh --skip-integration   # unit only
+./scripts/run_tests.sh --verbose            # verbose integration output
+./scripts/run_tests.sh --clean              # drop previous test build outputs first
+./scripts/run_tests.sh --help
 
 # Test a packaged release binary instead of a fresh dev build:
-./run_tests.sh --executable ./build/release/macos-arm64/logamuffin
-./run_tests.sh --executable /path/to/logamuffin.exe
+./scripts/run_tests.sh --executable ./build/release/macos-arm64/logamuffin
+./scripts/run_tests.sh --executable /path/to/logamuffin.exe
 ```
 
 The integration suite can also be run directly, on any platform:
@@ -144,7 +144,7 @@ public header; helpers shared only inside a module stay file-local.
 - `platform.hpp/.cpp` — OS surface (`hostname()`, `terminal()`,
   `terminal_width()`, `append_locked()`).
 
-`build.sh` and `run_tests.sh` compile the `SOURCES` list (all eight
+`build.sh` and `scripts/run_tests.sh` compile the `SOURCES` list (all eight
 translation units, including `logamuffin_core.cpp`). There is **no
 observable behavior change**: same messages, exit codes, streams, and
 file format. Unit tests need `logamuffin.hpp` plus the core sources.
@@ -216,19 +216,19 @@ extra`, lowercase levels, empty message.
 - Concurrency: 10 parallel writers → all 10 lines in the file.
 - Exit codes: `0` success/filtered/version, `2` usage/level/env errors.
 
-The legacy Bash suite `test.sh` is **deprecated**: it is now a thin
-shim forwarding to `run_tests.sh --skip-unit`. The Python suite
-supersedes it — it covers everything `test.sh` did (version, usage,
+The legacy Bash suite `scripts/test.sh` is **deprecated**: it is now a thin
+shim forwarding to `scripts/run_tests.sh --skip-unit`. The Python suite
+supersedes it — it covers everything `scripts/test.sh` did (version, usage,
 invalid severity, all severities, `INFO` filtering, `ALWAYS`,
 invalid `LOG_LEVEL`, stream routing, multiline) plus the missing
-cases above. `run_tests.sh` uses the Python suite.
+cases above. `scripts/run_tests.sh` uses the Python suite.
 
 ## CI
 
 CI (GitHub Actions, multi-OS/arch, sanitizers, debug/release matrix)
 is **intentionally out of scope for this ticket** and will be
 handled as a separate follow-up. Nothing in the test layout blocks
-it: `run_tests.sh` is the single entry point a CI job would call,
+it: `scripts/run_tests.sh` is the single entry point a CI job would call,
 and the integration suite already accepts an explicit binary for
 release verification.
 
@@ -266,12 +266,12 @@ color.hpp/.cpp                     color resolution
 log_levels.hpp/.cpp                level registry (LogLevel/Config)
 config.hpp/.cpp                    config pipeline (load_config)
 platform.hpp/.cpp                  platform/process helpers
-run_tests.sh                       one-command entry point
+scripts/run_tests.sh                       one-command entry point
 tests/unit/test_logamuffin.cpp     doctest unit tests
 tests/integration/test_cli.py      Python stdlib CLI tests
 tools/doctest/v2.5.3/doctest.h     vendored doctest
-test.sh                            deprecated shim -> run_tests.sh
-log.sh                             Bash `log` helper (source for `log`)
+scripts/test.sh                            deprecated shim -> scripts/run_tests.sh
+scripts/log.sh                             Bash `log` helper (source for `log`)
 docs/TESTING.md                    this file
 build/                             ignored outputs: build/debug/,
                                  build/release/<platform>/

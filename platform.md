@@ -22,7 +22,7 @@ bool append_locked(const std::filesystem::path& path, const std::string& entry);
 
 ## Notes
 
-No tests stub this module directly; the CLI integration suite in `tests/integration/test_cli.py` covers the observable behavior (streams, files, exit codes) end to end. Unit tests ([run_tests.md](run_tests.md)) deliberately stay off platform APIs.
+No tests stub this module directly; the CLI integration suite in `tests/integration/test_cli.py` covers the observable behavior (streams, files, exit codes) end to end. Unit tests ([scripts/run_tests.md](scripts/run_tests.md)) deliberately stay off platform APIs.
 
 ## Related pages
 

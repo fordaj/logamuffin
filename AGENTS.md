@@ -11,7 +11,7 @@ Key properties (see [README.md](README.md) for the full feature list):
 - Severity levels as words (`INFO`) or numbers (`50`), including custom categories with their own values and colors.
 - Configuration via environment variables, a JSON config file (`./.logamuffin` autodiscovery or `--config`/`LOG_CONFIG`), and defaults → file → environment precedence.
 - INFO-and-below to stdout, ERROR-and-above (value ≥ 40) to stderr; plain-text persistent file logging with concurrent-write protection.
-- A Bash `log` helper (`log.sh`) that adds call-site `LOG_SOURCE` tracking.
+- A Bash `log` helper (`scripts/log.sh`) that adds call-site `LOG_SOURCE` tracking.
 
 ## Core Principles
 
@@ -30,12 +30,12 @@ All of these are the real entry points — do not invent others.
 BUILD_MODE=debug scripts/build.sh
 
 # Test (C++ unit tests via doctest + Python CLI integration tests)
-./run_tests.sh                      # full suite
-./run_tests.sh --skip-unit          # integration only
-./run_tests.sh --skip-integration   # unit only
+./scripts/run_tests.sh                      # full suite
+./scripts/run_tests.sh --skip-unit          # integration only
+./scripts/run_tests.sh --skip-integration   # unit only
 
 # Format in place / check formatting (CI uses --check)
-./format.sh
+./scripts/format.sh
 ./ci/format_check.sh
 
 # Docs site (output ./site/, git-ignored)
@@ -45,11 +45,11 @@ scripts/docs.sh
 scripts/version.sh
 ```
 
-Requirements: a C++20 compiler (`clang++` default), Python 3 (stdlib only) for the integration suite, Bash, and for cross-compiled release targets Zig. CI (`.github/workflows/ci.yml`) runs `./ci/format_check.sh` on macOS and Windows and `./run_tests.sh` on macOS, on self-hosted runners. Releases go through `scripts/release.sh`.
+Requirements: a C++20 compiler (`clang++` default), Python 3 (stdlib only) for the integration suite, Bash, and for cross-compiled release targets Zig. CI (`.github/workflows/ci.yml`) runs `./ci/format_check.sh` on macOS and Windows and `./scripts/run_tests.sh` on macOS, on self-hosted runners. Releases go through `scripts/release.sh`.
 
 ## Repository Layout
 
-- Root: the C++ library and executable (`*.cpp`/`*.hpp`), root shell entry points (`demo.sh`, `format.sh`, `log.sh`, `run_tests.sh`, `test.sh`), `tests/` (unit + CLI integration), `docs/TESTING.md`, `pyproject.toml`/`uv.lock` (formattington pin), `.formattington.json`, `.versioner.json`, `.runner-spawner.json`.
+- Root: the C++ library and executable (`*.cpp`/`*.hpp`), shell entry points (`scripts/demo.sh`, `scripts/format.sh`, `scripts/log.sh`, `scripts/run_tests.sh`, `scripts/test.sh`), `tests/` (unit + CLI integration), `docs/TESTING.md`, `pyproject.toml`/`uv.lock` (formattington pin), `.formattington.json`, `.versioner.json`, `.runner-spawner.json`.
 - `scripts/` — build/release/docs tooling plus the hidden env cascade (`.common.env`, `.<platform>.env`). See `scripts/README.md`.
 - `tools/` — pinned helper bundles (versioner, logamuffin, runner-spawner, barnacle, formattington-lite), helpers (`generate_version.sh`, `sources.sh`), and vendored doctest. See `tools/README.md`.
 - `agents/` — agent prompt files; not part of the docs flow.
@@ -63,8 +63,7 @@ The repository's documentation is a set of Markdown (`.md`) source files rendere
 Layout — documentation lives next to the code it describes:
 
 - One sibling `.md` per C++ module at the repository root. Module pairs are documented together on one page (for example `color.cpp` + `color.hpp` → `color.md`; `config.cpp` + `config.hpp` → `config.md`; `json_parser.cpp` + `json_parser.hpp` → `json_parser.md`; `log_levels.cpp` + `log_levels.hpp` → `log_levels.md`; `platform.cpp` + `platform.hpp` → `platform.md`; `text_utils.cpp` + `text_utils.hpp` → `text_utils.md`). `logamuffin_core.cpp` has no header of its own and is documented with the executable it serves on `logamuffin.md` (which covers `logamuffin.cpp`, `logamuffin.hpp`, and `logamuffin_core.cpp`). The header-only `ansi_colors.hpp` gets `ansi_colors.md`.
-- One sibling `.md` per shell script at the root (`demo.sh` → `demo.md`, `format.sh` → `format.md`, `log.sh` → `log.md`, `run_tests.sh` → `run_tests.md`, `test.sh` → `test.md`).
-- One sibling `.md` per script in `scripts/` (`scripts/build.sh` → `scripts/build.md`, `scripts/docs.sh` → `scripts/docs.md`, `scripts/entry.sh` → `scripts/entry.md`, `scripts/env.sh` → `scripts/env.md`, `scripts/release.sh` → `scripts/release.md`, `scripts/version.sh` → `scripts/version.md`), plus `scripts/README.md` as the hub.
+- One sibling `.md` per script in `scripts/` (`scripts/build.sh` → `build.md`, `scripts/demo.sh` → `demo.md`, `scripts/docs.sh` → `docs.md`, `scripts/entry.sh` → `entry.md`, `scripts/env.sh` → `env.md`, `scripts/format.sh` → `format.md`, `scripts/log.sh` → `log.md`, `scripts/release.sh` → `release.md`, `scripts/run_tests.sh` → `run_tests.md`, `scripts/test.sh` → `test.md`, `scripts/version.sh` → `version.md`), plus `scripts/README.md` as the hub.
 - One page per helper in `tools/` (`tools/generate_version.sh` → `tools/generate_version.md`, `tools/sources.sh` → `tools/sources.md`), one `update.md` per bundle's `update.sh` (`tools/<name>/update.md` for `barnacle`, `formattington-lite`, `logamuffin`, `runner-spawner`, `versioner`), and `tools/doctest/README.md` for the vendored doctest bundle — plus `tools/README.md` as the hub.
 - `docs/TESTING.md` predates this system and stays as the testing guide; it is linked from the README and these pages, not duplicated.
 - `pyproject.toml` / `uv.lock` are configuration, not code — no sibling pages. `tests/` has no sibling pages either.
@@ -88,6 +87,6 @@ A change is complete when it:
 - Implements the requested behavior.
 - Preserves the established CLI contract (exit codes, stdout/stderr routing, documented env vars) unless intentionally changed, and keeps README examples consistent with the implementation.
 - Handles errors appropriately and stays compatible with the supported platforms (macOS, Windows, Linux; see `scripts/.common.env`).
-- Builds and tests cleanly: `./run_tests.sh` passes, and `./ci/format_check.sh` is clean.
+- Builds and tests cleanly: `./scripts/run_tests.sh` passes, and `./ci/format_check.sh` is clean.
 - Includes or updates tests where appropriate.
 - Updates relevant documentation — including the sibling `.md` pages above for every documented file touched — and keeps `scripts/docs.sh` free of broken local links.

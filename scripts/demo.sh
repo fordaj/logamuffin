@@ -3,7 +3,7 @@
 #
 # Every capability claimed in README.md is exercised here so a user can
 # visually spot regressions or spot new features when they run it:
-#   ./demo.sh
+#   ./scripts/demo.sh
 #
 # Sections follow the README order:
 #   1 version/help, 2 severity levels + colors, 3 aliases + case + joining,
@@ -30,7 +30,7 @@ resolve_logger() {
         return 0
     fi
 
-    # Fresh native debug build from ./run_tests.sh (single-command path).
+    # Fresh native debug build from ./scripts/run_tests.sh (single-command path).
     if [[ -x "$SCRIPT_DIR/build/debug/logamuffin" ]]; then
         printf '%s\n' "$SCRIPT_DIR/build/debug/logamuffin"
         return 0
@@ -85,7 +85,7 @@ resolve_logger() {
 
 if ! LOGGER="$(resolve_logger)"; then
     echo "ERROR: Logamuffin not found on PATH or in expected build directory." >&2
-    echo "Build it with scripts/build.sh, or ./run_tests.sh for a native build, or install it on PATH." >&2
+    echo "Build it with scripts/build.sh, or ./scripts/run_tests.sh for a native build, or install it on PATH." >&2
     exit 1
 fi
 
@@ -155,7 +155,7 @@ printf '\n'
 printf '  Standalone executable: a single binary, no Python/Node/interpreter\n'
 printf '  or framework required at runtime. Same CLI on macOS, Windows, Linux.\n'
 printf '  No recompile needed to reconfigure (env vars / JSON config below).\n'
-printf '  Run ./demo.sh again after any change to compare outputs visually.\n'
+printf '  Run ./scripts/demo.sh again after any change to compare outputs visually.\n'
 
 # ============================================================
 # 1. Version and help
@@ -696,17 +696,17 @@ LOG_LEVEL=25 "$LOGGER" 28 "shown: 28 at/above numeric 25"
 cmd "LOG_LEVEL=CRITICAL -1 \"ALWAYS via -1 (bypasses CRITICAL)\""
 LOG_LEVEL=CRITICAL "$LOGGER" -1 "ALWAYS via -1 (bypasses CRITICAL)"
 
-note '--- Bash `log` helper (source log.sh, call `log`) ---'
+note '--- Bash `log` helper (source scripts/log.sh, call `log`) ---'
 note 'Sets LOG_SOURCE to the call site (file:function:line) and'
 note 'forwards LEVEL (word or number) + message to logamuffin.'
 note 'Respects LOG_LEVEL / LOG_FILE / LOG_COLOR / config precedence.'
 
 export LOGAMUFFIN_BIN="$LOGGER"
-# shellcheck source=log.sh
+# shellcheck source=scripts/log.sh
 source "$SCRIPT_DIR/log.sh"
 
-cmd "log INFO \"via log helper (source = demo.sh:line)\""
-log INFO "via log helper (source = demo.sh:line)"
+cmd "log INFO \"via log helper (source = scripts/demo.sh:line)\""
+log INFO "via log helper (source = scripts/demo.sh:line)"
 
 cmd "log 50 \"via log helper, numeric\"  (stderr)"
 log 50 "via log helper, numeric"

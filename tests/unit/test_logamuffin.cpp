@@ -1,7 +1,7 @@
 // C++ unit tests for logamuffin's testable core (logamuffin.hpp).
 //
 // Framework: doctest (vendored at tools/doctest/v2.5.3/doctest.h).
-// Build + run via ./run_tests.sh (see docs/TESTING.md).
+// Build + run via ./scripts/run_tests.sh (see docs/TESTING.md).
 //
 // These tests cover observable pure logic only (parsing, filtering,
 // configuration, formatting). Process-level behavior (CLI exit codes,

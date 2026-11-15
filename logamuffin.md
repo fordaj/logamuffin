@@ -12,13 +12,13 @@
 
 ## Where it is used
 
-This _is_ the `logamuffin` binary (compiled from `SOURCES` in [tools/sources.md](tools/sources.md)). Shell scripts log through it directly or via [log.md](log.md); tests exercise it from `run_tests.sh`.
+This _is_ the `logamuffin` binary (compiled from `SOURCES` in [tools/sources.md](tools/sources.md)). Shell scripts log through it directly or via [scripts/log.md](scripts/log.md); tests exercise it from `scripts/run_tests.sh`.
 
 ## Related pages
 
 - [config.md](config.md) — configuration loading used by `run()`
 - [log_levels.md](log_levels.md) — the registry `resolve_level()` consults
 - [platform.md](platform.md) — hostname/TTY/width/locked-append helpers
-- [log.md](log.md) — the Bash `log` wrapper around this binary
-- [run_tests.md](run_tests.md) — how the module is built and tested
+- [scripts/log.md](scripts/log.md) — the Bash `log` wrapper around this binary
+- [scripts/run_tests.md](scripts/run_tests.md) — how the module is built and tested
 - [README.md](README.md) — user-facing documentation

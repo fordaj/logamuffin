@@ -32,7 +32,7 @@
 #     `logamuffin`; quote messages with spaces as usual.
 #
 # Install:
-#   # copy log.sh somewhere on PATH, or reference it directly:
+#   # copy scripts/log.sh somewhere on PATH, or reference it directly:
 #   source /path/to/log.sh
 #   # or paste the function into ~/.bashrc (see README: "Bash helper").
 #

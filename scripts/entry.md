@@ -8,7 +8,7 @@
 
 If the logamuffin binary is missing or not executable — a fresh clone before `tools/logamuffin/update.sh` is run — `log()` falls back to a printf implementation with the same call shape: level filtering against `LOG_LEVEL`/`LOGAMUFFIN_LEVEL` (default `INFO`), `40+` to stderr, and exit code `2` only for a missing level argument. This keeps bootstrap scripts usable before the bundles are present.
 
-Note: this is the repo-internal variant. The user-facing `log` Bash helper shipped for other projects lives in [../log.md](../log.md) (`log.sh` at the repo root) and additionally falls back to `PATH`/build outputs.
+Note: this is the repo-internal variant. The user-facing `log` Bash helper shipped for other projects lives in [../log.md](log.md) (`scripts/log.sh` at the repo root) and additionally falls back to `PATH`/build outputs.
 
 ## Vernacular seen in script headers
 

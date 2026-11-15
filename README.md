@@ -18,7 +18,7 @@ Simple commands. Consistent output. Logs you can actually read.
 - **Cross-platform** — builds for macOS, Windows, and Linux.
 - **Multiple severity levels** — filter messages by importance.
 - **Word and numeric levels** — use names (`TRACE`, `INFO`) or numbers (`50`) interchangeably.
-- **Bash `log` helper** — source `log.sh` for terse `log` calls with automatic source tracking.
+- **Bash `log` helper** — source `scripts/log.sh` for terse `log` calls with automatic source tracking.
 - **Extensible categories** — define custom log categories with their own numeric values and colors.
 - **Colorized terminal output** — distinguish informational messages, warnings, and errors at a glance.
 - **Persistent file logging** — append messages to a log file across invocations.
@@ -147,10 +147,10 @@ logamuffin INFO "Build completed successfully"
 
 ### Bash helper: the `log` function (issue #2)
 
-Instead of invoking `logamuffin` everywhere, source `log.sh` and call `log`:
+Instead of invoking `logamuffin` everywhere, source `scripts/log.sh` and call `log`:
 
 ```bash
-source /path/to/log.sh   # or source ./log.sh from this repo
+source /path/to/log.sh   # or source ./scripts/log.sh from this repo
 
 log INFO "Starting application"
 log TRACE "Very detailed execution information"
@@ -167,13 +167,13 @@ set -euo pipefail
 
 export LOG_LEVEL=INFO     # minimum level for the script
 export LOG_FILE=".logs/my-app.log"
-source ./log.sh           # provides log(); needs logamuffin on PATH
+source ./scripts/log.sh           # provides log(); needs logamuffin on PATH
 
 log INFO "Application started"
 log DEBUG "Loading configuration"
 ```
 
-The copy-paste function (also shipped as `log.sh` at the repository root — source that file, documented in [log.md](log.md), to get the identical behavior):
+The copy-paste function (also shipped as `scripts/log.sh` — source that file, documented in [scripts/log.md](scripts/log.md), to get the identical behavior):
 
 ```bash
 log() {
@@ -212,7 +212,7 @@ Tip: point `LOGAMUFFIN_BIN` at a build output when `logamuffin` is not on `PATH`
 
 ![Demo](https://raw.githubusercontent.com/fordaj/logamuffin/main/image.png)
 
-Run `./demo.sh` to see every capability above in action in one
+Run `./scripts/demo.sh` to see every capability above in action in one
 visual pass (version/help, levels and colors, numeric levels,
 filtering, streams, env and JSON configuration and precedence, file
 logging, concurrent writes, shell patterns, and the `log` helper).
@@ -464,7 +464,7 @@ it. `tools/generate_version.sh` runs the bundled binary under
 `tools/versioner/` and writes `.version/version.hpp`
 (`LOGAMUFFIN_VERSION` is the five-part string, e.g. `0.1.3.0.34`;
 `LOGAMUFFIN_VERSION_TAG` adds the `v` prefix, e.g. `v0.1.3.0.34`,
-alongside the five component macros). `build.sh` and `run_tests.sh`
+alongside the five component macros). `scripts/build.sh` and `scripts/run_tests.sh`
 regenerate the header before every build, so `logamuffin --version`
 always reflects the current `HEAD`. Refresh the bundled binaries with
 `tools/versioner/update.sh`. The generated `.version/` directory is
@@ -476,7 +476,7 @@ Logamuffin is covered by C++ unit tests and cross-platform CLI
 integration tests. Run the complete suite with:
 
 ```bash
-./run_tests.sh
+./scripts/run_tests.sh
 ```
 
 This builds the unit tests and a native development binary, then
@@ -487,9 +487,9 @@ vendored, so no package installation is needed.
 Useful variants:
 
 ```bash
-./run_tests.sh --skip-unit          # integration only
-./run_tests.sh --skip-integration   # unit only
-./run_tests.sh --executable ./build/release/macos-arm64/logamuffin  # test a release binary
+./scripts/run_tests.sh --skip-unit          # integration only
+./scripts/run_tests.sh --skip-integration   # unit only
+./scripts/run_tests.sh --executable ./build/release/macos-arm64/logamuffin  # test a release binary
 ```
 
 The CLI integration suite can also target any binary directly:
@@ -506,7 +506,7 @@ what each suite covers, and how to add tests.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on the repo's self-hosted
 macOS and Windows runners: a formatting check (`./ci/format_check.sh`) on
-both platforms, plus the test suite (`./run_tests.sh`) on macOS. Runners are
+both platforms, plus the test suite (`./scripts/run_tests.sh`) on macOS. Runners are
 managed with [runner-spawner](https://github.com/fordaj/runner-spawner)
 (see `.runner-spawner.json` and the bundled binary under
 `tools/runner-spawner/`).
@@ -522,7 +522,7 @@ orchestrates [Prettier](https://prettier.io/),
 Format everything in place:
 
 ```bash
-./format.sh
+./scripts/format.sh
 ```
 
 Check formatting without modifying files (as CI does):

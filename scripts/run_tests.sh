@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Run the complete logamuffin test suite (unit + CLI integration).
 #
-#   ./run_tests.sh                      # full suite (dev build)
-#   ./run_tests.sh --executable ./build/release/macos-arm64/logamuffin
-#   ./run_tests.sh --skip-unit          # integration only
-#   ./run_tests.sh --skip-integration   # unit only
-#   ./run_tests.sh --help
+#   ./scripts/run_tests.sh                      # full suite (dev build)
+#   ./scripts/run_tests.sh --executable ./build/release/macos-arm64/logamuffin
+#   ./scripts/run_tests.sh --skip-unit          # integration only
+#   ./scripts/run_tests.sh --skip-integration   # unit only
+#   ./scripts/run_tests.sh --help
 #
 # The integration suite (Python standard library only) can also target a
 # packaged release binary on any platform:
@@ -33,7 +33,7 @@ VERBOSE="false"
 
 usage() {
     cat <<'EOF'
-Usage: ./run_tests.sh [--executable PATH] [--skip-unit] [--skip-integration] [--clean] [--verbose]
+Usage: ./scripts/run_tests.sh [--executable PATH] [--skip-unit] [--skip-integration] [--clean] [--verbose]
 
 Runs the C++ unit tests and the cross-platform CLI integration tests.
 
@@ -50,8 +50,8 @@ Environment:
   CXX                  C++ compiler (default: clang++, falls back to c++).
 
 Examples:
-  ./run_tests.sh
-  ./run_tests.sh --executable ./build/release/macos-arm64/logamuffin
+  ./scripts/run_tests.sh
+  ./scripts/run_tests.sh --executable ./build/release/macos-arm64/logamuffin
   LOG_BIN=./logamuffin python3 tests/integration/test_cli.py
 
 On Windows, run the integration suite directly:
