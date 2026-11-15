@@ -4,8 +4,8 @@ requires-python = ">=3.14"
 
 [[package]]
 name = "formattington"
-version = "254.0.0.0.37"
-source = { git = "https://github.com/fordaj/formattington.git?rev=62680e3a5e5ae7cd2c78450fda536055574c591b#62680e3a5e5ae7cd2c78450fda536055574c591b" }
+version = "254.0.0.0.39"
+source = { git = "https://github.com/fordaj/formattington.git?rev=dbed7479da27bd9908fbd7e39c66cb84ab7d7aab#dbed7479da27bd9908fbd7e39c66cb84ab7d7aab" }
 
 [[package]]
 name = "logamuffin-tools"
@@ -16,4 +16,4 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "formattington", git = "https://github.com/fordaj/formattington.git?rev=62680e3a5e5ae7cd2c78450fda536055574c591b" }]
+requires-dist = [{ name = "formattington", git = "https://github.com/fordaj/formattington.git?rev=dbed7479da27bd9908fbd7e39c66cb84ab7d7aab" }]

@@ -398,7 +398,7 @@ Logamuffin is written in C++20 and can be built using a native compiler and Zig 
 - A C++ compiler with C++20 support, such as Clang.
 - Zig for the configured cross-compilation targets.
 - Bash for the build and release scripts.
-- `7z` and a SHA-256 utility for packaging releases.
+- `tar`/`zip` and a SHA-256 utility for packaging releases.
 - `git` and the bundled Versioner binary under `tools/versioner/`
   (see [Versioning](#versioning)) for dynamic version generation.
 
@@ -409,15 +409,15 @@ Clone the repository and run the build script:
 ```bash
 git clone <repository-url>
 cd logamuffin
-chmod +x build.sh release.bash
-./build.sh
+chmod +x scripts/build.sh scripts/release.sh
+scripts/build.sh
 ```
 
 The build script supports release and debug configurations.
 
 ```bash
-BUILD_MODE=debug ./build.sh
-BUILD_MODE=release ./build.sh
+BUILD_MODE=debug scripts/build.sh
+BUILD_MODE=release scripts/build.sh
 ```
 
 Outputs live under `build/<mode>/<platform>/` (for example
@@ -427,7 +427,7 @@ binaries never collide and the repository root stays clean.
 Every build first regenerates `.version/version.hpp` from git
 history via the bundled Versioner binary (see
 [Versioning](#versioning)); the `.version/` directory is
-git-ignored and compiled with `-I.version`. `release.bash`
+git-ignored and compiled with `-I.version`. `scripts/release.sh`
 packages the `build/release/<platform>/` binaries.
 
 ### Create release archives
@@ -435,22 +435,23 @@ packages the `build/release/<platform>/` binaries.
 Run:
 
 ```bash
-./release.bash
+scripts/release.sh
 ```
 
 The release script computes the version with the bundled Versioner
 binary, regenerates `.version/version.hpp`, builds the Zig targets
-via `./build.sh`, packs each platform into
-`Logamuffin_<tag>_<platform>.7z` (binary + `README.md` + `LICENSE`),
-writes `dist/checksums.txt`, tags `HEAD`, and publishes a GitHub
-release. Prerequisites for a real release: `zig`, `git`, `7z`,
-and `gh` authenticated via `gh auth login`; the working tree must
-be clean and `HEAD` pushed.
+via `scripts/build.sh`, packs each platform into
+`Logamuffin_<tag>_<platform>.tar.gz` (binary + `README.md` + `LICENSE`;
+`.zip` on Windows), writes `dist/checksums.txt`, tags `HEAD`, and
+publishes a GitHub release. Prerequisites for a real release: `zig`,
+`git`, `tar`, `zip`, and `gh` authenticated via `gh auth login`; the
+working tree must be clean and `HEAD` pushed. There is no 7zip
+dependency anywhere.
 
 To preview without touching anything remote:
 
 ```bash
-./release.bash --dry-run
+scripts/release.sh --dry-run
 ```
 
 ## Versioning
@@ -500,6 +501,15 @@ LOG_BIN=/path/to/logamuffin python3 tests/integration/test_cli.py
 
 See [docs/TESTING.md](docs/TESTING.md) for the testing architecture,
 what each suite covers, and how to add tests.
+
+## Continuous integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on the repo's self-hosted
+macOS and Windows runners: a formatting check (`./ci/format_check.bash`) on
+both platforms, plus the test suite (`./run_tests.sh`) on macOS. Runners are
+managed with [runner-spawner](https://github.com/fordaj/runner-spawner)
+(see `.runner-spawner.json` and the bundled binary under
+`tools/runner-spawner/`).
 
 ## Formatting
 

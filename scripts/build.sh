@@ -38,22 +38,23 @@ set -euo pipefail
     # ============================================================
 
     SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-    cd "$SCRIPT_DIR"
+    REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+    cd "$REPO_ROOT"
 
     # Single source for TU list (see tools/sources.sh).
     # shellcheck source=tools/sources.sh
-    source "$SCRIPT_DIR/tools/sources.sh"
+    source "$REPO_ROOT/tools/sources.sh"
 
     # Dynamically generate .version/version.hpp from git history via
     # the bundled fordaj/Versioner binary (see tools/generate_version.bash).
     # Regenerated before every build so --version reflects HEAD; the
     # .version/ directory is git-ignored. Compile with -I.version so
     # #include "version.hpp" finds the generated header.
-    if [[ ! -x "$SCRIPT_DIR/tools/generate_version.bash" ]]; then
+    if [[ ! -x "$REPO_ROOT/tools/generate_version.bash" ]]; then
         echo "ERROR: Missing tools/generate_version.bash" >&2
         exit 1
     fi
-    bash "$SCRIPT_DIR/tools/generate_version.bash"
+    bash "$REPO_ROOT/tools/generate_version.bash"
     echo
 
     # All build outputs live under build/<mode>/<platform>/ so release

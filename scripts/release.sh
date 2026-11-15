@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# release.bash - logamuffin release (adapted from fordaj/Versioner's
-# release.bash; same concept, Zig instead of Go).
+# scripts/release.sh - logamuffin release (adapted from fordaj/Versioner's
+# release.sh; same concept, Zig instead of Go).
 #
 # Uses the bundled Versioner binary to compute the next tag, regenerates
 # .version/version.hpp, cross-compiles the release binaries with
-# ./build.sh (Zig `zig c++` for the cross targets, native clang++ for
-# macOS), packs each platform into Logamuffin_<tag>_<platform>.7z
-# (binary + README + LICENSE), tags HEAD, and publishes a GitHub
-# release with the .7z archives + SHA-256 checksums.
+# scripts/build.sh (Zig `zig c++` for the cross targets, native clang++
+# for macOS), packs each platform into
+# Logamuffin_<tag>_<platform>.tar.gz (.zip on Windows; flat archives:
+# binary + README + LICENSE), tags HEAD, and publishes a GitHub
+# release with those archives + SHA-256 checksums.
 #
 # Usage:
-#   ./release.bash           # tag + push + GitHub release
-#   ./release.bash --dry-run # compute + build only, touch nothing remote
+#   scripts/release.sh           # tag + push + GitHub release
+#   scripts/release.sh --dry-run # compute + build only, touch nothing remote
 #
-# Prerequisites: zig, git, 7z (brew install p7zip / apt install
-# p7zip-full), and (for the real release) gh authenticated via
-# `gh auth login`. Working tree must be clean; HEAD should be pushed.
-# The bundled Versioner binary lives under tools/versioner/
-# (refresh with tools/versioner/update.bash).
+# Prerequisites: zig, git, tar, zip, and (for the real release) gh
+# authenticated via `gh auth login`. Working tree must be clean; HEAD
+# should be pushed. The bundled Versioner binary lives under
+# tools/versioner/ (refresh with tools/versioner/update.bash).
 
 set -euo pipefail
 
@@ -25,15 +25,16 @@ DRY_RUN=0
 
 usage() {
     cat <<'EOF'
-Usage: ./release.bash [--dry-run]
+Usage: scripts/release.sh [--dry-run]
 
 Compute the next version with the bundled Versioner binary (dogfooding
-concept from Versioner's release.bash), regenerate .version/version.hpp,
-cross-compile the release binaries via ./build.sh (Zig) into
+concept from Versioner's release.sh), regenerate .version/version.hpp,
+cross-compile the release binaries via scripts/build.sh (Zig) into
 build/release/<platform>/logamuffin[.exe], stage each into
 dist/<platform>/ with README.md + LICENSE, pack into
-Logamuffin_<tag>_<platform>.7z, create an annotated tag, push it, and
-create a GitHub release with the .7z archives + checksums.
+Logamuffin_<tag>_<platform>.tar.gz (.zip on Windows), create an
+annotated tag, push it, and create a GitHub release with the archives
++ checksums.
 
 Flags:
   --dry-run, -n   Build + compute version, but do not tag/push/release.
@@ -42,7 +43,7 @@ Flags:
 Env:
   VERSIONER_BIN   Path to a prebuilt versioner used for version computation
                   (default: bundled tools/versioner/v*/<platform>/versioner).
-  BUILD_MODE      Build mode for ./build.sh (default: release; the release
+  BUILD_MODE      Build mode for scripts/build.sh (default: release; the release
                   flow expects release outputs under build/release/).
 EOF
 }
@@ -58,31 +59,23 @@ while [[ $# -gt 0 ]]; do
         exit 0
         ;;
     *)
-        echo "release.bash: unknown argument: $1" >&2
+        echo "release.sh: unknown argument: $1" >&2
         usage >&2
         exit 2
         ;;
     esac
 done
 
-log() { printf 'release.bash: %s\n' "$*"; }
+log() { printf 'release.sh: %s\n' "$*"; }
 die() {
-    printf 'release.bash: error: %s\n' "$*" >&2
+    printf 'release.sh: error: %s\n' "$*" >&2
     exit 1
 }
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
-for cmd in git zig; do need_cmd "$cmd"; done
-
-if command -v 7zz >/dev/null 2>&1; then
-    SEVENZIP=7zz
-elif command -v 7z >/dev/null 2>&1; then
-    SEVENZIP=7z
-else
-    die "required command not found: 7z/7zz (brew install p7zip / apt-get install p7zip-full)"
-fi
+for cmd in git zig tar zip; do need_cmd "$cmd"; done
 
 if [[ "$DRY_RUN" -ne 1 ]]; then
     need_cmd gh
@@ -128,7 +121,7 @@ map_host_to_platform() {
 if [[ -n "$(git status --porcelain)" ]]; then
     if [[ "$DRY_RUN" -eq 1 ]]; then
         log "warning: working tree is not clean (allowed in --dry-run)"
-        git status --short | sed 's/^/release.bash:   /' >&2
+        git status --short | sed 's/^/release.sh:   /' >&2
     else
         die "working tree is not clean (commit or stash first):"$'\n'"$(git status --short)"
     fi
@@ -181,7 +174,7 @@ fi
 log "computing version with versioner (dogfooding)..."
 VERSION_OUT="$("$DOGFOOD_BIN" --repo-dir "$REPO_ROOT" --format shell)"
 log "versioner output:"
-printf '%s\n' "$VERSION_OUT" | sed 's/^/release.bash:   /'
+printf '%s\n' "$VERSION_OUT" | sed 's/^/release.sh:   /'
 
 VERSION="$(printf '%s\n' "$VERSION_OUT" | sed -n 's/^export VERSION=//p' | tail -1)"
 TAG="$(printf '%s\n' "$VERSION_OUT" | sed -n 's/^export TAG=//p' | tail -1)"
@@ -215,19 +208,19 @@ if ! grep -Fq "LOGAMUFFIN_VERSION_TAG \"$TAG\"" "$REPO_ROOT/.version/version.hpp
 fi
 
 # --- Cross-compile release binaries (Zig) ------------------------------
-log "cross-compiling release binaries (TAG=$TAG) via ./build.sh..."
-BUILD_MODE="${BUILD_MODE:-release}" bash "$REPO_ROOT/build.sh"
+log "cross-compiling release binaries (TAG=$TAG) via scripts/build.sh..."
+BUILD_MODE="${BUILD_MODE:-release}" bash "$REPO_ROOT/scripts/build.sh"
 
 shopt -s nullglob
 build_dirs=(build/release/*/)
-((${#build_dirs[@]} > 0)) || die "./build.sh produced no build/release/<platform>/ directories"
+((${#build_dirs[@]} > 0)) || die "scripts/build.sh produced no build/release/<platform>/ directories"
 log "built ${#build_dirs[@]} platform directories:"
 for d in "${build_dirs[@]}"; do log "  $d"; done
 
 # Stage dist/<platform>/ for packing: binary + README.md + LICENSE.
-# ./build.sh outputs build/release/<platform>/logamuffin[.exe];
+# scripts/build.sh outputs build/release/<platform>/logamuffin[.exe];
 # archives keep the binary at the archive root (flat), as in
-# Versioner's release.bash.
+# Versioner's release.sh.
 log "staging dist/..."
 rm -rf -- dist
 mkdir -p -- dist
@@ -239,7 +232,7 @@ for d in "${build_dirs[@]}"; do
         [[ -f "$cand" ]] && cp -p "$cand" "dist/$platform/"
     done
     for doc in README.md LICENSE; do
-        [[ -f "$doc" ]] || die "missing $doc (needed for .7z archives)"
+        [[ -f "$doc" ]] || die "missing $doc (needed for release archives)"
         cp -p "$doc" "dist/$platform/"
     done
 done
@@ -262,9 +255,10 @@ if map_host_to_platform; then
     fi
 fi
 
-# Pack each platform into Logamuffin_<tag>_<platform>.7z (flat: binary +
-# README.md + LICENSE at archive root).
-log "packing .7z archives with $SEVENZIP..."
+# Pack each platform into a platform-native archive (flat: binary +
+# README.md + LICENSE at archive root). Windows targets get .zip,
+# everything else gets .tar.gz.
+log "packing platform-native archives..."
 archives=()
 for d in dist/*/; do
     platform="$(basename "$d")"
@@ -275,32 +269,44 @@ for d in dist/*/; do
     [[ -n "$bin" ]] || die "no logamuffin binary in $d"
     [[ -s "$bin" ]] || die "built binary is empty: $bin"
     bin_name="$(basename "$bin")"
-    archive="dist/Logamuffin_${TAG}_${platform}.7z"
-    rm -f "$archive"
-    (cd "$d" && "$SEVENZIP" a -t7z "../Logamuffin_${TAG}_${platform}.7z" "$bin_name" README.md LICENSE >/dev/null)
+    case "$platform" in
+    windows-*)
+        archive="dist/Logamuffin_${TAG}_${platform}.zip"
+        rm -f "$archive"
+        (cd "$d" && zip -q -j "../Logamuffin_${TAG}_${platform}.zip" "$bin_name" README.md LICENSE)
+        ;;
+    *)
+        archive="dist/Logamuffin_${TAG}_${platform}.tar.gz"
+        rm -f "$archive"
+        (cd "$d" && tar -czf "../Logamuffin_${TAG}_${platform}.tar.gz" "$bin_name" README.md LICENSE)
+        ;;
+    esac
     [[ -s "$archive" ]] || die "failed to create $archive"
     log "  $archive:"
-    "$SEVENZIP" l "$archive" | sed 's/^/release.bash:     /'
+    case "$archive" in
+    *.zip) unzip -l "$archive" | sed 's/^/release.sh:     /' ;;
+    *) tar -tzf "$archive" | sed 's/^/release.sh:     /' ;;
+    esac
     archives+=("$archive")
 done
 
-# Checksums of the .7z archives (portable shasum; sha256sum fallback).
+# Checksums of the release archives (portable shasum; sha256sum fallback).
 log "generating checksums..."
 if command -v shasum >/dev/null 2>&1; then
-    (cd dist && shasum -a 256 Logamuffin_*.7z >checksums.txt)
+    (cd dist && shasum -a 256 Logamuffin_* >checksums.txt)
 elif command -v sha256sum >/dev/null 2>&1; then
-    (cd dist && sha256sum Logamuffin_*.7z >checksums.txt)
+    (cd dist && sha256sum Logamuffin_* >checksums.txt)
 else
     die "neither shasum nor sha256sum found (need one for checksums)"
 fi
-cat dist/checksums.txt | sed 's/^/release.bash:   /'
+cat dist/checksums.txt | sed 's/^/release.sh:   /'
 
 # --- Tag + GitHub release ----------------------------------------------
 if [[ "$DRY_RUN" -eq 1 ]]; then
     log "DRY RUN: would run:"
     log "  git tag -a $TAG -m \"logamuffin $TAG\""
     log "  git push origin $TAG"
-    log "  gh release create $TAG --title \"logamuffin $TAG\" --generate-notes dist/Logamuffin_*.7z dist/checksums.txt"
+    log "  gh release create $TAG --title \"logamuffin $TAG\" --generate-notes dist/Logamuffin_* dist/checksums.txt"
     log "dry run complete: VERSION=$VERSION TAG=$TAG"
     exit 0
 fi
@@ -312,10 +318,10 @@ log "pushing tag $TAG..."
 git push origin "$TAG"
 
 if gh release view "$TAG" >/dev/null 2>&1; then
-    die "GitHub release $TAG already exists (tag was pushed; upload assets manually with: gh release upload $TAG dist/Logamuffin_*.7z dist/checksums.txt --clobber)"
+    die "GitHub release $TAG already exists (tag was pushed; upload assets manually with: gh release upload $TAG dist/Logamuffin_* dist/checksums.txt --clobber)"
 fi
 
-log "creating GitHub release $TAG with ${#archives[@]} .7z archives + checksums..."
+log "creating GitHub release $TAG with ${#archives[@]} archives + checksums..."
 gh release create "$TAG" \
     --title "logamuffin $TAG" \
     --generate-notes \

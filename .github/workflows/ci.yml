@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref (pushes to a PR branch re-trigger
+# CI; old runs are cancelled).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-formatting:
+    name: Check Formatting (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macOS, labels: [self-hosted, macOS] }
+          - { os: Windows, labels: [self-hosted, Windows] }
+    runs-on: ${{ matrix.labels }}
+    timeout-minutes: 15
+    steps:
+      # Formatting does not need git history; keep the checkout shallow and
+      # fast. (The test job needs fetch-depth: 0 for version.hpp.)
+      - uses: actions/checkout@v7
+
+      # uv for the Python side (formattington via uv run). uv also
+      # fetches CPython 3.14 on first use.
+      - uses: astral-sh/setup-uv@v7
+
+      # node + npm for prettier only. clang-format is installed via uv
+      # (PyPI wheel) below — the npm clang-format package does not
+      # understand newer .clang-format options (e.g. InsertBraces).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install prettier
+        shell: bash
+        run: npm install --global prettier
+
+      # clang-format via the PyPI wheel (>=18). The npm clang-format
+      # package is pinned to old libclang releases and chokes on modern
+      # .clang-format options; the official wheel tracks upstream.
+      - name: Install clang-format
+        shell: bash
+        run: |
+          uv tool install 'clang-format>=18'
+          echo "$(uv tool dir --bin)" >> "$GITHUB_PATH"
+
+      # shfmt — pinned release, installed into a scratch bin dir.
+      - name: Install shfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin_dir="$RUNNER_TEMP/fmt-bin"
+          mkdir -p "$bin_dir"
+          case "$(uname -s)-$(uname -m)" in
+            Darwin-x86_64)                 s=shfmt_v3.14.1_darwin_amd64 ;;
+            Darwin-arm64)                  s=shfmt_v3.14.1_darwin_arm64 ;;
+            Linux-x86_64)                  s=shfmt_v3.14.1_linux_amd64 ;;
+            Linux-aarch64|Linux-arm64)     s=shfmt_v3.14.1_linux_arm64 ;;
+            MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) s=shfmt_v3.14.1_windows_amd64.exe ;;
+            MINGW*-aarch64|MSYS*-aarch64|CYGWIN*-aarch64|*arm64)   s=shfmt_v3.14.1_windows_amd64.exe ;;
+            *) echo "unsupported platform: $(uname -s) $(uname -m)" >&2; exit 2 ;;
+          esac
+          curl -fsSL "https://github.com/mvdan/sh/releases/download/v3.14.1/$s" -o "$bin_dir/shfmt"
+          chmod +x "$bin_dir/shfmt"
+          echo "$bin_dir" >> "$GITHUB_PATH"
+
+      - name: Tool versions
+        shell: bash
+        run: |
+          uv --version
+          prettier --version
+          clang-format --version
+          shfmt --version
+
+      # Requires uv, bash, prettier, clang-format, and shfmt (all installed
+      # above). Exits non-zero when anything is unformatted.
+      - name: Run formattington format check
+        shell: bash
+        run: ./ci/format_check.bash
+
+  test:
+    name: Test (macOS)
+    # The build system is Unix shell + clang++/Zig. The Windows runner only
+    # provides the formatting gate for now (the suite needs a Unix-ish
+    # toolchain; zip packaging covers releases). fetch-depth: 0 is required
+    # because .version/version.hpp is generated from git tags.
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Run test suite
+        shell: bash
+        run: ./run_tests.sh

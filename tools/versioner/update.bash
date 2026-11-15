@@ -1,22 +1,28 @@
 #!/usr/bin/env bash
-# update.bash — refresh bundled versioner binaries from fordaj/Versioner releases.
+# update.bash — refresh bundled Versioner binaries from fordaj/Versioner releases.
 #
 # Downloads the latest release's per-platform executables via gh, verifies
-# SHA256 checksums, extracts each binary into tools/versioner/<tag>/<platform>/
-# (platform matches get_platform_dir(): macos/linux/windows + x86_64/arm64,
-# so darwin-amd64 -> macos-x86_64, etc.), and deletes old version folders.
-# Only the binary is kept; docs (README.md, LICENSE, *.example.json) are
-# discarded. Old v*/ folders are deleted only after the new version is
-# fully staged, so a failed download leaves the previous bundle intact.
+# SHA256 checksums when the release ships them, extracts each binary into
+# tools/versioner/<tag>/<platform>/ (platform is the bundled <os>-<arch> layout:
+# macos/linux/windows + x86_64/arm64, so darwin-amd64 -> macos-x86_64, etc.),
+# and deletes old version folders. Old v*/ folders are deleted only after the
+# new version is fully staged, so a failed download leaves the previous
+# bundle intact.
+#
+# Archives are consumed in their platform-native formats: .tar.gz on
+# macOS/Linux and .zip on Windows. Legacy .7z assets are still accepted as
+# a fallback (requires 7z/7zz) so this script keeps working against releases
+# cut before the format change; new releases do not need p7zip at all.
 #
 # Usage:
 #   tools/versioner/update.bash              # download latest, replace old versions
 #   tools/versioner/update.bash --dry-run    # resolve tag + list assets, change nothing
 #   tools/versioner/update.bash --help       # usage
 #
-# Prerequisites: gh (https://cli.github.com/), 7z/7zz (p7zip), and (for the
-# real update) shasum or sha256sum for checksum verification. The script
-# resolves its own directory, so it can be run from anywhere.
+# Prerequisites: gh (https://cli.github.com/) and tar/unzip (.7z assets
+# additionally need 7z/7zz). The script resolves its own directory, so it can
+# be run from anywhere. Logging uses log <level> <message> from
+# scripts/entry.sh (logamuffin, with printf fallback).
 #
 # Layout after a successful run (example for v0.1.2.3):
 #   tools/versioner/
@@ -26,13 +32,22 @@
 #       macos-x86_64/versioner
 #       linux-arm64/versioner
 #       linux-x86_64/versioner
-#       windows-x86_64/versioner.exe
+#       windows-x86_64/versioner
 #
 # Env:
 #   VERSIONER_REPO  Repository slug (default: fordaj/Versioner)
 #   VERSIONER_TAG   Pinned tag (default: latest release)
 
 set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+REPO_ROOT_FOR_ENV=$(cd -- "$SCRIPT_DIR/../.." &>/dev/null && pwd)
+if [[ ! -f "$REPO_ROOT_FOR_ENV/scripts/entry.sh" ]]; then
+    printf 'update.bash: error: entry point not found: %s/scripts/entry.sh\n' "$REPO_ROOT_FOR_ENV" >&2
+    exit 1
+fi
+# shellcheck disable=SC1091
+. "$REPO_ROOT_FOR_ENV/scripts/entry.sh"
 
 DRY_RUN=0
 TAG="${VERSIONER_TAG:-}"
@@ -43,8 +58,8 @@ usage() {
 Usage: tools/versioner/update.bash [--dry-run] [--tag TAG] [--repo REPO]
 
 Download the latest Versioner release from GitHub via gh, extract each
-platform binary into tools/versioner/<tag>/<platform>/ (platform matches
-get_platform_dir(), e.g. darwin-amd64 -> macos-x86_64), and delete old
+platform binary into tools/versioner/<tag>/<platform>/ (platform is the
+bundled <os>-<arch> layout, e.g. darwin-amd64 -> macos-x86_64), and delete old
 version folders. Only the binary is kept.
 
 Flags:
@@ -71,7 +86,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     --tag)
         [[ $# -ge 2 ]] || {
-            echo "update.bash: --tag requires a value" >&2
+            log ERROR "--tag requires a value"
             usage >&2
             exit 2
         }
@@ -84,7 +99,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     --repo)
         [[ $# -ge 2 ]] || {
-            echo "update.bash: --repo requires a value" >&2
+            log ERROR "--repo requires a value"
             usage >&2
             exit 2
         }
@@ -96,7 +111,7 @@ while [[ $# -gt 0 ]]; do
         shift
         ;;
     *)
-        echo "update.bash: unknown argument: $1" >&2
+        log ERROR "unknown argument: $1"
         usage >&2
         exit 2
         ;;
@@ -104,36 +119,25 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$REPO" ]] || {
-    echo "update.bash: repository must not be empty" >&2
+    log ERROR "repository must not be empty"
     exit 2
 }
 
-log() { printf 'update.bash: %s\n' "$*"; }
 die() {
-    printf 'update.bash: error: %s\n' "$*" >&2
+    log ERROR "$*" || true
     exit 1
 }
 need_cmd() {
-    command -v "$1" >/dev/null 2>&1 || die "required command not found: $1 (https://cli.github.com/)"
+    command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
 need_cmd gh
+need_cmd tar
 
-if [[ "$DRY_RUN" -ne 1 ]]; then
-    if command -v 7zz >/dev/null 2>&1; then
-        SEVENZIP=7zz
-    elif command -v 7z >/dev/null 2>&1; then
-        SEVENZIP=7z
-    else
-        die "required command not found: 7z/7zz (brew install p7zip / apt-get install p7zip-full)"
-    fi
-fi
-
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-VERSIONER_ROOT="$SCRIPT_DIR"
-[[ -d "$VERSIONER_ROOT" ]] || die "versioner bundle directory not found: $VERSIONER_ROOT"
-log "versioner bundle directory: $VERSIONER_ROOT"
-log "repository: $REPO"
+TOOL_ROOT="$SCRIPT_DIR"
+[[ -d "$TOOL_ROOT" ]] || die "versioner bundle directory not found: $TOOL_ROOT"
+log INFO "versioner bundle directory: $TOOL_ROOT"
+log INFO "repository: $REPO"
 
 if [[ -z "$TAG" ]]; then
     TAG="$(gh release view --repo "$REPO" --json tagName -q .tagName)" ||
@@ -143,33 +147,53 @@ fi
 if ! [[ "$TAG" =~ ^v[0-9]+(\.[0-9]+)+$ ]]; then
     die "invalid tag '$TAG' (expected vX.Y.Z...)"
 fi
-log "release tag: $TAG"
+log INFO "release tag: $TAG"
 
-# map_upstream_to_platform <os-arch> sets PLATFORM (e.g. darwin-arm64 -> macos-arm64)
-# or returns 1 for unknown values. Sets globals to avoid subshell-die pitfalls.
-map_upstream_to_platform() {
-    local os_arch="$1"
-    local upstream_os="${os_arch%-*}"
-    local upstream_arch="${os_arch##*-}"
-    local mapped_os=""
-    local mapped_arch=""
-    case "$upstream_os" in
-    darwin) mapped_os="macos" ;;
-    linux) mapped_os="linux" ;;
-    windows) mapped_os="windows" ;;
-    *) return 1 ;;
+# parse_stem_to_platform <stem> sets PLATFORM (e.g.
+# Versioner_v0.0.3.0.5_darwin-arm64 -> macos-arm64) or returns 1 for
+# unknown values. Accepts any single separator before the os-arch suffix and
+# normalizes x64 -> x86_64, amd64 -> x86_64, x86_64 -> x86_64, darwin -> macos.
+parse_stem_to_platform() {
+    local stem="$1"
+    local suffix="${stem##*[-_]}"
+    local prefix="${stem%[-_]*}"
+    # Reconstruct the os-arch pair: strip a trailing -lite/-full from the suffix area first.
+    case "$suffix" in
+    lite | full)
+        suffix="${prefix##*[-_]}"
+        prefix="${prefix%[-_]*}"
+        ;;
     esac
-    case "$upstream_arch" in
-    amd64 | x86_64) mapped_arch="x86_64" ;;
-    arm64 | aarch64) mapped_arch="arm64" ;;
-    *) return 1 ;;
+    # suffix may be e.g. "arm64" alone only when the os was in prefix; redo as regex below instead.
+    if [[ "$stem" =~ [-_](darwin-amd64|darwin-arm64|darwin-x86_64|macos-x86_64|macos-arm64|macos-x64|macos-amd64|linux-x86_64|linux-amd64|linux-x64|linux-arm64|windows-x86_64|windows-amd64|windows-x64|windows-arm64)(-lite|-full)?$ ]]; then
+        case "${BASH_REMATCH[1]}" in
+        darwin-amd64 | darwin-x86_64 | macos-x86_64 | macos-x64 | macos-amd64) PLATFORM="macos-x86_64" ;;
+        darwin-arm64 | macos-arm64) PLATFORM="macos-arm64" ;;
+        linux-x86_64 | linux-amd64 | linux-x64) PLATFORM="linux-x86_64" ;;
+        linux-arm64) PLATFORM="linux-arm64" ;;
+        windows-x86_64 | windows-amd64 | windows-x64) PLATFORM="windows-x86_64" ;;
+        windows-arm64) PLATFORM="windows-arm64" ;;
+        *) return 1 ;;
+        esac
+        VARIANT="${BASH_REMATCH[2]#-}"
+        return 0
+    fi
+    return 1
+}
+
+strip_archive_ext() {
+    local name="$1"
+    case "$name" in
+    *.tar.gz) printf '%s' "${name%.tar.gz}" ;;
+    *.zip) printf '%s' "${name%.zip}" ;;
+    *.7z) printf '%s' "${name%.7z}" ;;
+    *) printf '%s' "$name" ;;
     esac
-    PLATFORM="$mapped_os-$mapped_arch"
 }
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-    log "DRY RUN: no download, extraction, or deletion will happen"
-    log "release $TAG assets:"
+    log INFO "DRY RUN: no download, extraction, or deletion will happen"
+    log INFO "release $TAG assets:"
     assets_list=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].name' ||
         die "could not list assets for $TAG in $REPO")
     [[ -n "$assets_list" ]] || die "no assets found for $TAG in $REPO"
@@ -177,39 +201,42 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     while IFS= read -r asset; do
         [[ -n "$asset" ]] || continue
         case "$asset" in
-        *.7z)
+        *.tar.gz | *.zip | *.7z)
+            stem="$(strip_archive_ext "$asset")"
+            if [[ "" != "" && "$stem" != *"" ]]; then
+                log INFO "  $asset (ignored: not a  archive)"
+                continue
+            fi
             asset_count=$((asset_count + 1))
-            stem="${asset%.7z}"
-            os_arch="${stem##*_}"
-            if map_upstream_to_platform "$os_arch"; then
-                log "  $asset -> $TAG/$PLATFORM"
+            if parse_stem_to_platform "$stem"; then
+                log INFO "  $asset -> $TAG/$PLATFORM"
             else
-                log "  $asset -> unknown platform (would fail)"
+                log INFO "  $asset -> unknown platform (would fail)"
             fi
             ;;
-        checksums.txt)
-            log "  $asset (checksums)"
+        checksums.txt | SHA256SUMS.txt)
+            log INFO "  $asset (checksums)"
             ;;
         *)
-            log "  $asset (ignored)"
+            log INFO "  $asset (ignored)"
             ;;
         esac
     done <<<"$assets_list"
-    ((asset_count > 0)) || die "no .7z assets found for $TAG in $REPO"
+    ((asset_count > 0)) || die "no platform archives found for $TAG in $REPO"
     shopt -s nullglob
     old_found=0
-    for dir in "$VERSIONER_ROOT"/v*/; do
+    for dir in "$TOOL_ROOT"/v*/; do
         [[ -d "$dir" ]] || continue
         dir_name="$(basename "$dir")"
         if [[ "$dir_name" != "$TAG" ]]; then
-            log "would remove old $dir_name"
+            log INFO "would remove old $dir_name"
             old_found=1
         fi
     done
     if [[ "$old_found" -eq 0 ]]; then
-        log "no old version folders to remove"
+        log INFO "no old version folders to remove"
     fi
-    log "dry run complete: would update $VERSIONER_ROOT/$TAG"
+    log INFO "dry run complete: would update $TOOL_ROOT/$TAG"
     exit 0
 fi
 
@@ -227,72 +254,134 @@ cleanup() {
 trap cleanup EXIT
 
 TMP_DIR="$(mktemp -d)"
-STAGE_DIR="$(mktemp -d "$VERSIONER_ROOT/.tmp.XXXXXX")"
+STAGE_DIR="$(mktemp -d "$TOOL_ROOT/.tmp.XXXXXX")"
 
-log "downloading $TAG assets from $REPO..."
-gh release download "$TAG" --repo "$REPO" --dir "$TMP_DIR" --pattern '*.7z' --pattern 'checksums.txt' --clobber
+log INFO "downloading $TAG assets from $REPO..."
+gh release download "$TAG" --repo "$REPO" --dir "$TMP_DIR" --pattern '*.tar.gz' --pattern '*.zip' --pattern '*.7z' --pattern 'checksums.txt' --pattern 'SHA256SUMS.txt' --clobber
 
 shopt -s nullglob
-archives=("$TMP_DIR"/*.7z)
-((${#archives[@]} > 0)) || die "no .7z assets downloaded from $REPO $TAG"
-log "downloaded ${#archives[@]} .7z archives"
-
-if [[ -f "$TMP_DIR/checksums.txt" ]]; then
-    log "verifying checksums..."
-    if command -v shasum >/dev/null 2>&1; then
-        (cd "$TMP_DIR" && shasum -a 256 -c checksums.txt) || die "checksum verification failed for $TAG"
-    elif command -v sha256sum >/dev/null 2>&1; then
-        (cd "$TMP_DIR" && sha256sum -c checksums.txt) || die "checksum verification failed for $TAG"
-    else
-        die "checksums.txt present but neither shasum nor sha256sum found"
+archives=()
+for archive in "$TMP_DIR"/*.tar.gz "$TMP_DIR"/*.zip "$TMP_DIR"/*.7z; do
+    [[ -e "$archive" ]] || continue
+    stem="$(strip_archive_ext "$(basename "$archive")")"
+    if [[ "" != "" && "$stem" != *"" ]]; then
+        continue
     fi
-    log "checksums verified"
+    archives+=("$archive")
+done
+((${#archives[@]} > 0)) || die "no platform archives downloaded from $REPO $TAG"
+log INFO "downloaded ${#archives[@]} platform archives"
+
+checksums_file=""
+for candidate in checksums.txt SHA256SUMS.txt; do
+    if [[ -f "$TMP_DIR/$candidate" ]]; then
+        checksums_file="$TMP_DIR/$candidate"
+        break
+    fi
+done
+if [[ -n "$checksums_file" ]]; then
+    log INFO "verifying checksums ($(basename "$checksums_file"))..."
+    # The checksums file may be cumulative across releases (or list every
+    # uploaded asset), so verify only the archives downloaded for this run.
+    checksum_tool=""
+    if command -v shasum >/dev/null 2>&1; then
+        checksum_tool="shasum -a 256"
+    elif command -v sha256sum >/dev/null 2>&1; then
+        checksum_tool="sha256sum"
+    fi
+    [[ -n "$checksum_tool" ]] || die "checksums file present but neither shasum nor sha256sum found"
+    verify_list="$TMP_DIR/.verify-list"
+    : >"$verify_list"
+    for archive in "${archives[@]}"; do
+        base="$(basename "$archive")"
+        grep -F " $base" "$checksums_file" >>"$verify_list" ||
+            die "no checksum entry for downloaded asset $base in $(basename "$checksums_file")"
+    done
+    # Entries are "<sha>  <name>" (or with a leading *), relative to $TMP_DIR.
+    (cd "$TMP_DIR" && $checksum_tool -c "$verify_list") || die "checksum verification failed for $TAG"
+    log INFO "checksums verified"
 else
-    log "warning: no checksums.txt in $TAG release; skipping verification"
+    log WARNING "no checksums in $TAG release; skipping verification"
 fi
+
+# Extract one archive into a destination directory, format-agnostic.
+extract_archive() {
+    local archive="$1" dest="$2"
+    case "$archive" in
+    *.tar.gz)
+        tar -xzf "$archive" -C "$dest"
+        ;;
+    *.zip)
+        need_cmd unzip
+        unzip -q "$archive" -d "$dest"
+        ;;
+    *.7z)
+        if command -v 7zz >/dev/null 2>&1; then
+            7zz x -y "$archive" -o"$dest" >/dev/null
+        elif command -v 7z >/dev/null 2>&1; then
+            7z x -y "$archive" -o"$dest" >/dev/null
+        else
+            die "legacy .7z asset $(basename "$archive") requires 7z/7zz (this release predates platform-native archives)"
+        fi
+        ;;
+    *)
+        die "unsupported archive format: $archive"
+        ;;
+    esac
+}
 
 for archive in "${archives[@]}"; do
     base="$(basename "$archive")"
-    stem="${base%.7z}"
-    os_arch="${stem##*_}"
-    if ! map_upstream_to_platform "$os_arch"; then
+    stem="$(strip_archive_ext "$base")"
+    if ! parse_stem_to_platform "$stem"; then
         die "unknown platform in asset '$base' (expected <os>-<arch> such as darwin-arm64)"
     fi
     if [[ -e "$STAGE_DIR/$PLATFORM" ]]; then
         die "duplicate asset for platform $PLATFORM (from $base)"
     fi
-    log "extracting $base -> $TAG/$PLATFORM"
+    log INFO "extracting $base -> $TAG/$PLATFORM"
     extract_dir="$TMP_DIR/extract-$PLATFORM"
     mkdir -p "$extract_dir"
-    "$SEVENZIP" x -y "$archive" -o"$extract_dir" >/dev/null
+    extract_archive "$archive" "$extract_dir"
     bin_src=""
     for cand in "$extract_dir/versioner" "$extract_dir/versioner.exe"; do
         if [[ -f "$cand" ]]; then
             bin_src="$cand"
+            break
         fi
     done
-    [[ -n "$bin_src" ]] || die "no versioner binary in $base (expected versioner or versioner.exe at archive root)"
+    if [[ -z "$bin_src" ]]; then
+        # Some archives nest everything under a single top-level directory.
+        for cand in "$extract_dir"/*/versioner "$extract_dir"/*/versioner.exe; do
+            if [[ -f "$cand" ]]; then
+                bin_src="$cand"
+                break
+            fi
+        done
+    fi
+    [[ -n "$bin_src" ]] || die "no versioner binary in $base (expected versioner)"
     bin_name="$(basename "$bin_src")"
     target_dir="$STAGE_DIR/$PLATFORM"
     mkdir -p "$target_dir"
     cp -p "$bin_src" "$target_dir/$bin_name"
     chmod +x "$target_dir/$bin_name"
     [[ -s "$target_dir/$bin_name" ]] || die "installed binary is empty: $target_dir/$bin_name"
-    log "installed $PLATFORM/$bin_name (from $base)"
+
+    log INFO "installed $PLATFORM/$bin_name (from $base)"
     rm -rf -- "$extract_dir"
 done
 
-TAG_DIR="$VERSIONER_ROOT/$TAG"
+TAG_DIR="$TOOL_ROOT/$TAG"
 rm -rf -- "$TAG_DIR"
-mkdir -p "$VERSIONER_ROOT"
+mkdir -p "$TOOL_ROOT"
 mv "$STAGE_DIR" "$TAG_DIR"
 STAGE_DIR=""
 
-for dir in "$VERSIONER_ROOT"/v*/; do
+for dir in "$TOOL_ROOT"/v*/; do
     [[ -d "$dir" ]] || continue
     dir_name="$(basename "$dir")"
     if [[ "$dir_name" != "$TAG" ]]; then
-        log "removing old $dir_name"
+        log INFO "removing old $dir_name"
         rm -rf -- "$dir"
     fi
 done
@@ -320,17 +409,17 @@ for cand in "$TAG_DIR/$host_platform/versioner" "$TAG_DIR/$host_platform/version
 done
 if [[ -n "$host_bin" ]]; then
     host_ver="$("$host_bin" --version 2>&1 || true)"
-    log "host binary $host_platform reports: $host_ver"
+    log INFO "host binary $host_platform reports: $host_ver"
     case "$host_ver" in
-    *"$TAG"*) ;;
-    *) log "warning: host binary version '$host_ver' does not contain $TAG" ;;
+    *"$TAG"* | *"${TAG#v}"*) ;;
+    *) log WARNING "host binary version '$host_ver' does not contain $TAG" ;;
     esac
 else
-    log "warning: host platform $host_platform not in bundle; skipped version check"
+    log WARNING "host platform $host_platform not in bundle; skipped version check"
 fi
 
-log "done: $TAG_DIR now contains:"
+log INFO "done: $TAG_DIR now contains:"
 for dir in "$TAG_DIR"/*/; do
     [[ -d "$dir" ]] || continue
-    log "  $(basename "$dir")"
+    log INFO "  $(basename "$dir")"
 done
