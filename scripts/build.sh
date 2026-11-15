@@ -46,15 +46,15 @@ set -euo pipefail
     source "$REPO_ROOT/tools/sources.sh"
 
     # Dynamically generate .version/version.hpp from git history via
-    # the bundled fordaj/Versioner binary (see tools/generate_version.bash).
+    # the bundled fordaj/Versioner binary (see tools/generate_version.sh).
     # Regenerated before every build so --version reflects HEAD; the
     # .version/ directory is git-ignored. Compile with -I.version so
     # #include "version.hpp" finds the generated header.
-    if [[ ! -x "$REPO_ROOT/tools/generate_version.bash" ]]; then
-        echo "ERROR: Missing tools/generate_version.bash" >&2
+    if [[ ! -x "$REPO_ROOT/tools/generate_version.sh" ]]; then
+        echo "ERROR: Missing tools/generate_version.sh" >&2
         exit 1
     fi
-    bash "$REPO_ROOT/tools/generate_version.bash"
+    bash "$REPO_ROOT/tools/generate_version.sh"
     echo
 
     # All build outputs live under build/<mode>/<platform>/ so release

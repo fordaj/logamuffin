@@ -1,17 +1,17 @@
-# Printing the repository version (`scripts/version.bash`)
+# Printing the repository version (`scripts/version.sh`)
 
-`scripts/version.bash` prints the version of the repository as computed by [Versioner](../tools/versioner/update.md), so the version of a build and the version of a release can never drift apart. It is sourced-independent: it loads [entry.md](entry.md) itself and works from any cwd.
+`scripts/version.sh` prints the version of the repository as computed by [Versioner](../tools/versioner/update.md), so the version of a build and the version of a release can never drift apart. It is sourced-independent: it loads [entry.md](entry.md) itself and works from any cwd.
 
 ## Usage
 
 ```bash
-scripts/version.bash                 # VERSION=<v> and TAG=<t> lines (default)
-scripts/version.bash --format text   # same as default
-scripts/version.bash --format shell  # export VERSION=... and export TAG=...
-scripts/version.bash --format json   # raw json from versioner
+scripts/version.sh                 # VERSION=<v> and TAG=<t> lines (default)
+scripts/version.sh --format text   # same as default
+scripts/version.sh --format shell  # export VERSION=... and export TAG=...
+scripts/version.sh --format json   # raw json from versioner
 ```
 
-Unknown arguments and unknown `--format` values exit 2; a missing/unexecutable `VERSIONER_BIN` exits 1 with instructions to run `tools/versioner/update.bash`.
+Unknown arguments and unknown `--format` values exit 2; a missing/unexecutable `VERSIONER_BIN` exits 1 with instructions to run `tools/versioner/update.sh`.
 
 ## How it resolves the binary
 

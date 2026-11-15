@@ -140,16 +140,16 @@ if [[ -n "$EXECUTABLE" && ! -x "$EXECUTABLE" && ! -f "$EXECUTABLE" ]]; then
 fi
 
 # Dynamically generate .version/version.hpp from git history via the
-# bundled fordaj/Versioner binary (see tools/generate_version.bash).
+# bundled fordaj/Versioner binary (see tools/generate_version.sh).
 # The unit tests and the native dev binary include "version.hpp" with
 # -I.version; the directory is git-ignored, so regenerate before
 # building (same as build.sh). Skipped only when nothing is built.
 if [[ "$SKIP_UNIT" != "true" || -z "$EXECUTABLE" ]]; then
-    if [[ ! -x "tools/generate_version.bash" ]]; then
-        echo "ERROR: Missing tools/generate_version.bash" >&2
+    if [[ ! -x "tools/generate_version.sh" ]]; then
+        echo "ERROR: Missing tools/generate_version.sh" >&2
         exit 1
     fi
-    if ! bash "tools/generate_version.bash"; then
+    if ! bash "tools/generate_version.sh"; then
         echo "ERROR: failed to generate .version/version.hpp" >&2
         exit 1
     fi

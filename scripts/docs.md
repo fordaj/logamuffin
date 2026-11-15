@@ -17,7 +17,7 @@ Any arguments other than `--help`/`-h` are forwarded to barnacle verbatim; see `
 
 ## How it locates barnacle
 
-Sources [entry.md](entry.md); `BARNACLE_BIN` comes from the [cascade](env.md) (`tools/barnacle/v<version>/<platform>/barnacle[.exe]`). If the bundle is missing or not executable, the script fails with instructions to run `tools/barnacle/update.bash` (or set `BARNACLE_BIN` explicitly). It then runs barnacle with the repository root as the working directory, so barnacle's auto-discovered `./.barnacle.json` (optional, absent here) and its default `./site/` output land at the repository root regardless of the caller's cwd.
+Sources [entry.md](entry.md); `BARNACLE_BIN` comes from the [cascade](env.md) (`tools/barnacle/v<version>/<platform>/barnacle[.exe]`). If the bundle is missing or not executable, the script fails with instructions to run `tools/barnacle/update.sh` (or set `BARNACLE_BIN` explicitly). It then runs barnacle with the repository root as the working directory, so barnacle's auto-discovered `./.barnacle.json` (optional, absent here) and its default `./site/` output land at the repository root regardless of the caller's cwd.
 
 ## What the site contains
 

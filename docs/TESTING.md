@@ -24,7 +24,7 @@ There is **one command** to run everything:
 - Bash (the `run_tests.sh` entry point is POSIX; the integration suite itself is cross-platform).
 - `git` and the bundled Versioner binary under `tools/versioner/`
   (`run_tests.sh` regenerates `.version/version.hpp` from git history
-  via `tools/generate_version.bash` before compiling; the `.version/`
+  via `tools/generate_version.sh` before compiling; the `.version/`
   directory is git-ignored).
 
 No other dependencies. The doctest header is already vendored at

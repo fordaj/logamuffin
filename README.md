@@ -460,14 +460,14 @@ Logamuffin versions come from [fordaj/Versioner](https://github.com/fordaj/Versi
 which derives a five-part version (`branch.major.minor.revision.patch`)
 from git history. `.versioner.json` (modeled on Versioner's default:
 `main` exempt to branch-version `0`, other branches to `254`) configures
-it. `tools/generate_version.bash` runs the bundled binary under
+it. `tools/generate_version.sh` runs the bundled binary under
 `tools/versioner/` and writes `.version/version.hpp`
 (`LOGAMUFFIN_VERSION` is the five-part string, e.g. `0.1.3.0.34`;
 `LOGAMUFFIN_VERSION_TAG` adds the `v` prefix, e.g. `v0.1.3.0.34`,
 alongside the five component macros). `build.sh` and `run_tests.sh`
 regenerate the header before every build, so `logamuffin --version`
 always reflects the current `HEAD`. Refresh the bundled binaries with
-`tools/versioner/update.bash`. The generated `.version/` directory is
+`tools/versioner/update.sh`. The generated `.version/` directory is
 git-ignored and must not be committed.
 
 ## Testing
@@ -505,7 +505,7 @@ what each suite covers, and how to add tests.
 ## Continuous integration
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on the repo's self-hosted
-macOS and Windows runners: a formatting check (`./ci/format_check.bash`) on
+macOS and Windows runners: a formatting check (`./ci/format_check.sh`) on
 both platforms, plus the test suite (`./run_tests.sh`) on macOS. Runners are
 managed with [runner-spawner](https://github.com/fordaj/runner-spawner)
 (see `.runner-spawner.json` and the bundled binary under
@@ -522,13 +522,13 @@ orchestrates [Prettier](https://prettier.io/),
 Format everything in place:
 
 ```bash
-./format.bash
+./format.sh
 ```
 
 Check formatting without modifying files (as CI does):
 
 ```bash
-./ci/format_check.bash
+./ci/format_check.sh
 ```
 
 Both commands run `uv run formattington all` with the commands declared in

@@ -6,17 +6,17 @@
 
 ```text
 tools/logamuffin/
-  update.bash                     # refresh from fordaj/logamuffin releases
+  update.sh                     # refresh from fordaj/logamuffin releases
   v0.1.3.0.35/                    # NOT committed to git at present
-    macos-arm64/logamuffin        # (fetch with update.bash)
+    macos-arm64/logamuffin        # (fetch with update.sh)
     ...
 ```
 
-`scripts/.common.env` pins `LOGAMUFFIN_VERSION_DIR=tools/logamuffin/v0.1.3.0.35` and the platform env files point `LOGAMUFFIN_BIN` at it. Only `update.bash` is tracked in git — the v0.1.3.0.35 binaries are absent from this checkout, so `scripts/entry.sh`'s `log()` currently falls back to printf until the bundle is fetched. (The `.gitignore` does not exclude them; they simply have not been committed/fetched here.)
+`scripts/.common.env` pins `LOGAMUFFIN_VERSION_DIR=tools/logamuffin/v0.1.3.0.35` and the platform env files point `LOGAMUFFIN_BIN` at it. Only `update.sh` is tracked in git — the v0.1.3.0.35 binaries are absent from this checkout, so `scripts/entry.sh`'s `log()` currently falls back to printf until the bundle is fetched. (The `.gitignore` does not exclude them; they simply have not been committed/fetched here.)
 
 Pinned as `LOGAMUFFIN v0.1.3.0.35`; see [../../scripts/env.md](../../scripts/env.md).
 
-## `update.bash` in detail
+## `update.sh` in detail
 
 Assets are `logamuffin-<platform>.tar.gz` (macOS/Linux) and `logamuffin-<platform>.zip` (Windows), carrying the binary at the archive root or inside a single top-level directory. The script:
 

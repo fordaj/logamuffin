@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# version.bash - print the version of the repository.
+# version.sh - print the version of the repository.
 #
 # The version is computed by versioner (see tools/versioner and
 # .versioner.json), so the version of a build and the version of a release
 # can never drift apart.
 #
 # Usage:
-#   scripts/version.bash                 # prints "VERSION=<v>" and "TAG=<t>"
-#   scripts/version.bash --format shell  # prints "export VERSION=..." lines
-#   scripts/version.bash --format json   # prints the raw versioner json
+#   scripts/version.sh                 # prints "VERSION=<v>" and "TAG=<t>"
+#   scripts/version.sh --format shell  # prints "export VERSION=..." lines
+#   scripts/version.sh --format json   # prints the raw versioner json
 #
 # Environment:
 #   VERSIONER_BIN        Path to the versioner binary (default: via scripts/env.sh).
@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     --help | -h)
         cat <<'EOF'
-Usage: scripts/version.bash [--format text|shell|json]
+Usage: scripts/version.sh [--format text|shell|json]
 
 Print the version of the repository computed by versioner.
 
@@ -59,7 +59,7 @@ REPO_DIR="${VERSIONER_REPO_DIR:-${REPO_ROOT_DIR:-$SCRIPT_DIR/..}}"
 REPO_DIR="$(cd -- "$REPO_DIR" && pwd)"
 
 if [[ -z "${VERSIONER_BIN:-}" || ! -x "${VERSIONER_BIN:-}" ]]; then
-    log ERROR "no versioner binary found (run tools/versioner/update.bash or set VERSIONER_BIN)"
+    log ERROR "no versioner binary found (run tools/versioner/update.sh or set VERSIONER_BIN)"
     exit 1
 fi
 

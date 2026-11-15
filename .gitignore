@@ -49,7 +49,7 @@ dist
 *.exe
 *.out
 *.app
-# ... except bundled Versioner binaries (tools/versioner/update.bash).
+# ... except bundled Versioner binaries (tools/versioner/update.sh).
 !tools/**/*.exe
 
 # Build directories
@@ -88,7 +88,7 @@ __pycache__/
 # Python tooling (uv / formattington)
 .venv/
 
-# Generated version header (fordaj/Versioner via tools/generate_version.bash)
+# Generated version header (fordaj/Versioner via tools/generate_version.sh)
 .version/
 
 # Self-hosted runners (.runner-spawner.json)

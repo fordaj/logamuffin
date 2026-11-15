@@ -6,7 +6,7 @@
 
 ```text
 tools/barnacle/
-  update.bash                     # refresh from fordaj/barnacle releases
+  update.sh                     # refresh from fordaj/barnacle releases
   v0.0.1.0.5/
     macos-arm64/barnacle
     macos-x86_64/barnacle
@@ -18,7 +18,7 @@ tools/barnacle/
 
 Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v0.0.1.0.5` in `scripts/.common.env`; selected via `BARNACLE_BIN` in the platform env files (see [../../scripts/env.md](../../scripts/env.md)).
 
-## `update.bash` in detail
+## `update.sh` in detail
 
 Assets are `barnacle-<platform>.tar.gz` (macOS/Linux) and `barnacle-<platform>.zip` (Windows), each carrying the binary at the archive root or inside a single top-level directory. The script:
 

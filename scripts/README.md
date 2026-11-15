@@ -18,7 +18,7 @@ Vernacular used in the headers (`log INFO`, `$REPO_ROOT_DIR`, `VERSIONER_BIN`): 
 - [docs.md](docs.md) — generate the documentation site you are reading, with the bundled barnacle.
 - [entry.md](entry.md) / [env.md](env.md) — the sourced cascade and `log()` helper (not entry points).
 
-`ci/format_check.bash` at `ci/` is the check-only counterpart of the root [format.bash](../format.md) used by CI; `run_tests.sh` at the root is the test entry point ([../run_tests.md](../run_tests.md)).
+`ci/format_check.sh` at `ci/` is the check-only counterpart of the root [format.sh](../format.md) used by CI; `run_tests.sh` at the root is the test entry point ([../run_tests.md](../run_tests.md)).
 
 ## Related pages
 

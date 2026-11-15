@@ -1,12 +1,12 @@
-# Regenerating the version header (`tools/generate_version.bash`)
+# Regenerating the version header (`tools/generate_version.sh`)
 
-`tools/generate_version.bash` regenerates `.version/version.hpp` from git history via the bundled [Versioner](versioner/update.md) binary. Build scripts call it before compiling so `logamuffin --version` always reflects the current `HEAD`. The `.version/` directory is git-ignored and must not be committed.
+`tools/generate_version.sh` regenerates `.version/version.hpp` from git history via the bundled [Versioner](versioner/update.md) binary. Build scripts call it before compiling so `logamuffin --version` always reflects the current `HEAD`. The `.version/` directory is git-ignored and must not be committed.
 
 ## Usage
 
 ```bash
-tools/generate_version.bash          # regenerate .version/version.hpp
-tools/generate_version.bash --help   # usage
+tools/generate_version.sh          # regenerate .version/version.hpp
+tools/generate_version.sh --help   # usage
 ```
 
 Prerequisites: `git` (versioner shells out to it) and a bundled versioner binary for this host (or `VERSIONER_BIN` set to a prebuilt one). Compile with `-I.version` so `#include "version.hpp"` resolves.

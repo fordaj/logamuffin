@@ -6,7 +6,7 @@
 
 ```text
 tools/runner-spawner/
-  update.bash                     # refresh from fordaj/runner-spawner releases
+  update.sh                     # refresh from fordaj/runner-spawner releases
   v0.0.1.2.6/
     macos-arm64/runner-spawner
     macos-x86_64/runner-spawner
@@ -18,7 +18,7 @@ tools/runner-spawner/
 
 Pinned as `RUNNER_SPAWNER_VERSION_DIR=tools/runner-spawner/v0.0.1.2.6` in `scripts/.common.env`; selected via `RUNNER_SPAWNER_BIN` in the platform env files (see [../../scripts/env.md](../../scripts/env.md)). Note: runner-spawner reports unsupported on Linux (macOS + Windows only) — the Linux binaries ship for a uniform layout but `scripts/.linux-*.env` records that caveat.
 
-## `update.bash` in detail
+## `update.sh` in detail
 
 Same shape as the other bundles, with one deliberate difference:
 

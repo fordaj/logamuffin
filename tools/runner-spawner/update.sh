@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# update.bash — refresh bundled runner-spawner binaries from fordaj/runner-spawner releases.
+# update.sh — refresh bundled runner-spawner binaries from fordaj/runner-spawner releases.
 #
 # Downloads the latest release's per-platform executables via gh, verifies
 # SHA256 checksums when the release ships them, extracts each binary into
@@ -15,9 +15,9 @@
 # cut before the format change; new releases do not need p7zip at all.
 #
 # Usage:
-#   tools/runner-spawner/update.bash              # download latest, replace old versions
-#   tools/runner-spawner/update.bash --dry-run    # resolve tag + list assets, change nothing
-#   tools/runner-spawner/update.bash --help       # usage
+#   tools/runner-spawner/update.sh              # download latest, replace old versions
+#   tools/runner-spawner/update.sh --dry-run    # resolve tag + list assets, change nothing
+#   tools/runner-spawner/update.sh --help       # usage
 #
 # Prerequisites: gh (https://cli.github.com/) and tar/unzip (.7z assets
 # additionally need 7z/7zz). The script resolves its own directory, so it can
@@ -26,7 +26,7 @@
 #
 # Layout after a successful run (example for v0.1.2.3):
 #   tools/runner-spawner/
-#     update.bash
+#     update.sh
 #     v0.1.2.3/
 #       macos-arm64/runner-spawner
 #       macos-x86_64/runner-spawner
@@ -43,7 +43,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT_FOR_ENV=$(cd -- "$SCRIPT_DIR/../.." &>/dev/null && pwd)
 if [[ ! -f "$REPO_ROOT_FOR_ENV/scripts/entry.sh" ]]; then
-    printf 'update.bash: error: entry point not found: %s/scripts/entry.sh\n' "$REPO_ROOT_FOR_ENV" >&2
+    printf 'update.sh: error: entry point not found: %s/scripts/entry.sh\n' "$REPO_ROOT_FOR_ENV" >&2
     exit 1
 fi
 # shellcheck disable=SC1091
@@ -55,7 +55,7 @@ REPO="${RUNNER_SPAWNER_TOOL_REPO:-fordaj/runner-spawner}"
 
 usage() {
     cat <<'EOF'
-Usage: tools/runner-spawner/update.bash [--dry-run] [--tag TAG] [--repo REPO]
+Usage: tools/runner-spawner/update.sh [--dry-run] [--tag TAG] [--repo REPO]
 
 Download the latest runner-spawner release from GitHub via gh, extract each
 platform binary into tools/runner-spawner/<tag>/<platform>/ (platform is the

@@ -1,12 +1,12 @@
 # The formattington-lite bundle (`tools/formattington-lite/`)
 
-[Formattington](https://github.com/fordaj/formattington) is the formatter orchestrator (prettier, clang-format, shfmt and friends) used by this repository's `format.bash`/`ci/format_check.bash` — via the `pyproject.toml`/`uv.lock` Python pin, not this bundle. The `formattington-lite` bundle is a slim prebuilt binary kept in the repo for direct invocation; it is **not** wired into the environment cascade (`scripts/.common.env` pins only versioner, logamuffin, runner-spawner, and barnacle).
+[Formattington](https://github.com/fordaj/formattington) is the formatter orchestrator (prettier, clang-format, shfmt and friends) used by this repository's `format.sh`/`ci/format_check.sh` — via the `pyproject.toml`/`uv.lock` Python pin, not this bundle. The `formattington-lite` bundle is a slim prebuilt binary kept in the repo for direct invocation; it is **not** wired into the environment cascade (`scripts/.common.env` pins only versioner, logamuffin, runner-spawner, and barnacle).
 
 ## Layout
 
 ```text
 tools/formattington-lite/
-  update.bash                     # refresh from fordaj/formattington releases
+  update.sh                     # refresh from fordaj/formattington releases
   v0.0.2.0.53/
     macos-arm64/formattington
     macos-x86_64/formattington
@@ -18,7 +18,7 @@ tools/formattington-lite/
 
 The bundle is pinned by its version directory (`tools/formattington-lite/v0.0.2.0.53/`); no `*_VERSION_DIR` in `scripts/.common.env` references it.
 
-## `update.bash` in detail
+## `update.sh` in detail
 
 Same shape as the other bundles in this directory, with formattington specifics:
 

@@ -1,16 +1,16 @@
-# Formatting in place (`format.bash`)
+# Formatting in place (`format.sh`)
 
-`format.bash` formats the whole repository with [formattington](https://github.com/fordaj/formattington): Markdown via prettier, C/C++ via clang-format, shell via `shfmt -i 4`, as scoped by `.formattington.json` and styled by `.clang-format`/`.prettierrc`. The vendored header under `tools/doctest/` is skipped (as are `build/` and other generated locations).
+`format.sh` formats the whole repository with [formattington](https://github.com/fordaj/formattington): Markdown via prettier, C/C++ via clang-format, shell via `shfmt -i 4`, as scoped by `.formattington.json` and styled by `.clang-format`/`.prettierrc`. The vendored header under `tools/doctest/` is skipped (as are `build/` and other generated locations).
 
 ## Usage
 
 ```bash
-./format.bash              # format everything in place
-./format.bash --series     # format sequentially (ordered output)
-./format.bash --verbose    # show which formatter executables were resolved
+./format.sh              # format everything in place
+./format.sh --series     # format sequentially (ordered output)
+./format.sh --verbose    # show which formatter executables were resolved
 ```
 
-Extra flags are forwarded to `formattington` before `all`. `--config` is managed by the script and must not be passed. CI uses the check-only counterpart `ci/format_check.bash` (same config, `--check`); see "Formatting" in [README.md](README.md).
+Extra flags are forwarded to `formattington` before `all`. `--config` is managed by the script and must not be passed. CI uses the check-only counterpart `ci/format_check.sh` (same config, `--check`); see "Formatting" in [README.md](README.md).
 
 ## Prerequisites and pinning
 

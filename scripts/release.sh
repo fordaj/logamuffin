@@ -17,7 +17,7 @@
 # Prerequisites: zig, git, tar, zip, and (for the real release) gh
 # authenticated via `gh auth login`. Working tree must be clean; HEAD
 # should be pushed. The bundled Versioner binary lives under
-# tools/versioner/ (refresh with tools/versioner/update.bash).
+# tools/versioner/ (refresh with tools/versioner/update.sh).
 
 set -euo pipefail
 
@@ -139,7 +139,7 @@ fi
 # --- Dogfooding: use bundled versioner + compute VERSION/TAG ---------
 # Versioner's release builds Versioner from Go source and runs it;
 # logamuffin instead uses the vendored binary under tools/versioner/
-# (the same binary tools/generate_version.bash uses), since there is
+# (the same binary tools/generate_version.sh uses), since there is
 # no Go toolchain in this repo. VERSIONER_BIN overrides as before.
 if [[ -n "${VERSIONER_BIN:-}" ]]; then
     [[ -x "$VERSIONER_BIN" ]] || die "VERSIONER_BIN=$VERSIONER_BIN is not executable"
@@ -147,7 +147,7 @@ if [[ -n "${VERSIONER_BIN:-}" ]]; then
     log "using prebuilt versioner: $DOGFOOD_BIN"
 else
     # Resolve the bundled binary for this host (mirrors
-    # tools/generate_version.bash; newest tag dir when several exist).
+    # tools/generate_version.sh; newest tag dir when several exist).
     if ! map_host_to_platform; then
         die "unsupported host for bundled versioner: $(uname -s)/$(uname -m) (set VERSIONER_BIN to a prebuilt versioner)"
     fi
@@ -156,7 +156,7 @@ else
     windows-*) bin_name="versioner.exe" ;;
     esac
     bundle_root="$REPO_ROOT/tools/versioner"
-    [[ -d "$bundle_root" ]] || die "versioner bundle not found: $bundle_root (run tools/versioner/update.bash)"
+    [[ -d "$bundle_root" ]] || die "versioner bundle not found: $bundle_root (run tools/versioner/update.sh)"
     DOGFOOD_BIN=""
     shopt -s nullglob
     for dir in "$bundle_root"/v*/; do
@@ -167,7 +167,7 @@ else
         fi
     done
     shopt -u nullglob
-    [[ -n "$DOGFOOD_BIN" ]] || die "bundled versioner for $HOST_PLATFORM not found under $bundle_root (run: tools/versioner/update.bash; or set VERSIONER_BIN)"
+    [[ -n "$DOGFOOD_BIN" ]] || die "bundled versioner for $HOST_PLATFORM not found under $bundle_root (run: tools/versioner/update.sh; or set VERSIONER_BIN)"
     log "using bundled versioner: $DOGFOOD_BIN"
 fi
 
@@ -201,7 +201,7 @@ fi
 # Same generator build.sh uses; build.sh re-runs it before compiling,
 # so the header and the binaries always agree on VERSION.
 log "regenerating .version/version.hpp..."
-bash "$REPO_ROOT/tools/generate_version.bash"
+bash "$REPO_ROOT/tools/generate_version.sh"
 [[ -f "$REPO_ROOT/.version/version.hpp" ]] || die "failed to generate .version/version.hpp"
 if ! grep -Fq "LOGAMUFFIN_VERSION_TAG \"$TAG\"" "$REPO_ROOT/.version/version.hpp"; then
     die "generated .version/version.hpp does not contain $TAG (versioner mismatch?)"
