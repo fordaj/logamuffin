@@ -96,3 +96,6 @@ __pycache__/
 
 # Tool logs
 .logs/
+
+# Git worktrees
+.worktrees/
