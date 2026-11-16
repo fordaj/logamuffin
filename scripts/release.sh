@@ -89,6 +89,10 @@ if ! REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
 fi
 cd "$REPO_ROOT"
 
+# Shared host detection + bundled-versioner resolution (tools/host_platform.sh).
+# shellcheck source=tools/host_platform.sh
+. "$REPO_ROOT/tools/host_platform.sh"
+
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 HEAD_SHORT="$(git rev-parse --short HEAD)"
 log "repo: $REPO_ROOT"
@@ -96,26 +100,6 @@ log "branch: $BRANCH  HEAD: $HEAD_SHORT"
 if [[ "$DRY_RUN" -eq 1 ]]; then
     log "DRY RUN: no tag/push/release will happen"
 fi
-
-# map_host_to_platform sets HOST_PLATFORM (e.g. Darwin/arm64 -> macos-arm64)
-# matching build.sh output dirs. Used for the native --version check.
-map_host_to_platform() {
-    local os arch mapped_os mapped_arch
-    os="$(uname -s)"
-    arch="$(uname -m)"
-    case "$os" in
-    Darwin) mapped_os="macos" ;;
-    Linux) mapped_os="linux" ;;
-    MINGW* | MSYS* | CYGWIN*) mapped_os="windows" ;;
-    *) return 1 ;;
-    esac
-    case "$arch" in
-    x86_64 | amd64) mapped_arch="x86_64" ;;
-    arm64 | aarch64) mapped_arch="arm64" ;;
-    *) return 1 ;;
-    esac
-    HOST_PLATFORM="$mapped_os-$mapped_arch"
-}
 
 # --- Precondition: clean working tree ---------------------------------
 if [[ -n "$(git status --porcelain)" ]]; then
@@ -136,52 +120,18 @@ if ! git fetch origin --tags 2>/dev/null; then
     fi
 fi
 
-# --- Dogfooding: use bundled versioner + compute VERSION/TAG ---------
-# Versioner's release builds Versioner from Go source and runs it;
-# logamuffin instead uses the vendored binary under tools/versioner/
-# (the same binary tools/generate_version.sh uses), since there is
-# no Go toolchain in this repo. VERSIONER_BIN overrides as before.
-if [[ -n "${VERSIONER_BIN:-}" ]]; then
-    [[ -x "$VERSIONER_BIN" ]] || die "VERSIONER_BIN=$VERSIONER_BIN is not executable"
-    DOGFOOD_BIN="$VERSIONER_BIN"
-    log "using prebuilt versioner: $DOGFOOD_BIN"
-else
-    # Resolve the bundled binary for this host (mirrors
-    # tools/generate_version.sh; newest tag dir when several exist).
-    if ! map_host_to_platform; then
-        die "unsupported host for bundled versioner: $(uname -s)/$(uname -m) (set VERSIONER_BIN to a prebuilt versioner)"
-    fi
-    bin_name="versioner"
-    case "$HOST_PLATFORM" in
-    windows-*) bin_name="versioner.exe" ;;
-    esac
-    bundle_root="$REPO_ROOT/tools/versioner"
-    [[ -d "$bundle_root" ]] || die "versioner bundle not found: $bundle_root (run tools/versioner/update.sh)"
-    DOGFOOD_BIN=""
-    shopt -s nullglob
-    for dir in "$bundle_root"/v*/; do
-        candidate_name="$(basename "$dir")"
-        candidate="$bundle_root/$candidate_name/$HOST_PLATFORM/$bin_name"
-        if [[ -x "$candidate" ]]; then
-            DOGFOOD_BIN="$candidate"
-        fi
-    done
-    shopt -u nullglob
-    [[ -n "$DOGFOOD_BIN" ]] || die "bundled versioner for $HOST_PLATFORM not found under $bundle_root (run: tools/versioner/update.sh; or set VERSIONER_BIN)"
-    log "using bundled versioner: $DOGFOOD_BIN"
-fi
+# --- Dogfooding: compute VERSION/TAG with the bundled versioner (or VERSIONER_BIN) ---
+locate_versioner "$REPO_ROOT" || exit 1
+DOGFOOD_BIN="$VERSIONER_PATH"
+log "using versioner: $DOGFOOD_BIN"
 
 log "computing version with versioner (dogfooding)..."
 VERSION_OUT="$("$DOGFOOD_BIN" --repo-dir "$REPO_ROOT" --format shell)"
 log "versioner output:"
 printf '%s\n' "$VERSION_OUT" | sed 's/^/release.sh:   /'
 
-VERSION="$(printf '%s\n' "$VERSION_OUT" | sed -n 's/^export VERSION=//p' | tail -1)"
-TAG="$(printf '%s\n' "$VERSION_OUT" | sed -n 's/^export TAG=//p' | tail -1)"
-# Shell format quotes unsafe values; versions are safe, strip one
-# layer of single quotes defensively.
-if [[ "$VERSION" == \'* && "$VERSION" == *\' ]]; then VERSION="${VERSION:1:-1}"; fi
-if [[ "$TAG" == \'* && "$TAG" == *\' ]]; then TAG="${TAG:1:-1}"; fi
+VERSION="$(parse_shell_export VERSION)"
+TAG="$(parse_shell_export TAG)"
 [[ -n "$VERSION" ]] || die "could not parse VERSION from versioner output"
 [[ -n "$TAG" ]] || die "could not parse TAG from versioner output"
 if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -239,7 +189,7 @@ done
 
 # Native binary should report our version (guards -I.version wiring:
 # logamuffin --version prints LOGAMUFFIN_VERSION, i.e. VERSION w/o v).
-if map_host_to_platform; then
+if HOST_PLATFORM="$(host_platform)"; then
     native_suffix=""
     case "$HOST_PLATFORM" in
     windows-*) native_suffix=".exe" ;;

@@ -77,91 +77,20 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 [[ -d "$REPO_ROOT" ]] || die "repo root not found: $REPO_ROOT"
 cd "$REPO_ROOT"
 
+# Shared host detection + bundled-versioner resolution (tools/host_platform.sh).
+# shellcheck source=tools/host_platform.sh
+. "$REPO_ROOT/tools/host_platform.sh"
+
 OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/.version}"
 VERSION_HEADER="$OUTPUT_DIR/version.hpp"
 
-# map_host_to_platform sets PLATFORM (e.g. Darwin/arm64 -> macos-arm64)
-# or returns 1 for unknown values. Mirrors tools/versioner/update.sh and
-# demo.sh so the bundled binary lookup stays consistent.
-map_host_to_platform() {
-    local os arch mapped_os mapped_arch
-    os="$(uname -s)"
-    arch="$(uname -m)"
-    case "$os" in
-    Darwin) mapped_os="macos" ;;
-    Linux) mapped_os="linux" ;;
-    MINGW* | MSYS* | CYGWIN*) mapped_os="windows" ;;
-    *) return 1 ;;
-    esac
-    case "$arch" in
-    x86_64 | amd64) mapped_arch="x86_64" ;;
-    arm64 | aarch64) mapped_arch="arm64" ;;
-    *) return 1 ;;
-    esac
-    PLATFORM="$mapped_os-$mapped_arch"
-}
-
-# locate_versioner sets VERSIONER_PATH to the binary to run.
-# VERSIONER_BIN env wins; otherwise the bundled tools/versioner/v*/
-# <platform>/versioner[.exe] (newest tag dir when several exist).
-locate_versioner() {
-    if [[ -n "${VERSIONER_BIN:-}" ]]; then
-        [[ -x "$VERSIONER_BIN" ]] || die "VERSIONER_BIN=$VERSIONER_BIN is not executable"
-        VERSIONER_PATH="$VERSIONER_BIN"
-        return 0
-    fi
-    if ! map_host_to_platform; then
-        die "unsupported host for bundled versioner: $(uname -s)/$(uname -m) (set VERSIONER_BIN to a prebuilt versioner)"
-    fi
-    local bin_name="versioner"
-    case "$PLATFORM" in
-    windows-*) bin_name="versioner.exe" ;;
-    esac
-    local bundle_root="$REPO_ROOT/tools/versioner"
-    [[ -d "$bundle_root" ]] || die "versioner bundle not found: $bundle_root (run tools/versioner/update.sh)"
-    local candidate candidate_name last=""
-    shopt -s nullglob
-    for dir in "$bundle_root"/v*/; do
-        candidate_name="$(basename "$dir")"
-        candidate="$bundle_root/$candidate_name/$PLATFORM/$bin_name"
-        if [[ -x "$candidate" ]]; then
-            last="$candidate"
-        fi
-    done
-    shopt -u nullglob
-    if [[ -z "$last" ]]; then
-        die "bundled versioner for $PLATFORM not found under $bundle_root (run: tools/versioner/update.sh; or set VERSIONER_BIN)"
-    fi
-    VERSIONER_PATH="$last"
-}
-
-locate_versioner
+locate_versioner "$REPO_ROOT" || exit 1
 log "using versioner: $VERSIONER_PATH"
 log "repo: $REPO_ROOT"
 
 VERSION_OUT="$("$VERSIONER_PATH" --repo-dir "$REPO_ROOT" --format shell)" ||
     die "versioner failed for $REPO_ROOT"
 printf '%s\n' "$VERSION_OUT" | sed 's/^/generate_version.sh:   /'
-
-# parse_shell_export <name> prints the unquoted value of
-# "export <name>=<value>" (last occurrence wins). Versioner quotes
-# only unsafe values; generated versions are safe, but strip one
-# layer of single quotes defensively.
-parse_shell_export() {
-    local name="$1" value=""
-    while IFS= read -r line; do
-        case "$line" in
-        export\ "$name"=*)
-            value="${line#export "$name"=}"
-            ;;
-        esac
-    done <<<"$VERSION_OUT"
-    # Trim surrounding single quotes if present (shellQuote form).
-    if [[ "$value" == \'* && "$value" == *\' ]]; then
-        value="${value:1:-1}"
-    fi
-    printf '%s' "$value"
-}
 
 VERSION_BRANCH="$(parse_shell_export VERSION_BRANCH)"
 VERSION_MAJOR="$(parse_shell_export VERSION_MAJOR)"

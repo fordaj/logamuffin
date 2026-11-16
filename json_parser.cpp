@@ -95,6 +95,16 @@ namespace logamuffin
     return pos_ >= text_.size();
   }
 
+  // Consumes a run of ASCII digits. Callers decide whether at least one
+  // digit was required (see parseNumber).
+  void JsonParser::consumeDigits()
+  {
+    while (!atEnd() && std::isdigit(static_cast<unsigned char>(peek())))
+    {
+      consume();
+    }
+  }
+
   // Caller must ensure !atEnd().
   char JsonParser::peek() const
   {
@@ -227,10 +237,7 @@ namespace logamuffin
     }
     else
     {
-      while (!atEnd() && std::isdigit(static_cast<unsigned char>(peek())))
-      {
-        consume();
-      }
+      consumeDigits();
     }
     // fraction part (optional ".digits")
     if (!atEnd() && peek() == '.')
@@ -240,10 +247,7 @@ namespace logamuffin
       {
         return fail(err, "invalid number");
       }
-      while (!atEnd() && std::isdigit(static_cast<unsigned char>(peek())))
-      {
-        consume();
-      }
+      consumeDigits();
     }
     // exponent part (optional "e[+-]digits")
     if (!atEnd() && (peek() == 'e' || peek() == 'E'))
@@ -257,10 +261,7 @@ namespace logamuffin
       {
         return fail(err, "invalid number");
       }
-      while (!atEnd() && std::isdigit(static_cast<unsigned char>(peek())))
-      {
-        consume();
-      }
+      consumeDigits();
     }
     // convert
     try

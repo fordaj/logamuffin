@@ -70,8 +70,14 @@ fi
 
 OUTPUT="$("$VERSIONER_BIN" --repo-dir "$REPO_DIR" --quiet)"
 
-VERSION="$(printf '%s\n' "$OUTPUT" | sed -n 's/^VERSION=//p' | tail -1)"
-TAG="$(printf '%s\n' "$OUTPUT" | sed -n 's/^TAG=//p' | tail -1)"
+VERSION=""
+TAG=""
+while IFS= read -r line; do
+    case "$line" in
+    VERSION=*) VERSION="${line#VERSION=}" ;;
+    TAG=*) TAG="${line#TAG=}" ;;
+    esac
+done <<<"$OUTPUT"
 
 [[ -n "$VERSION" ]] || {
     log ERROR "could not parse VERSION from the versioner output"

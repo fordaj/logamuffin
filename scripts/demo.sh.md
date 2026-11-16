@@ -23,7 +23,7 @@ flowchart TD
 
 There is intentionally no `set -e`: several sections trigger expected failures (unknown level, bad config) to show exit codes, so aborting on error would defeat the demo.
 
-The script locates a `logamuffin` binary by `command -v`, then `build/debug/logamuffin` (the [scripts/run_tests.sh.md](run_tests.sh.md) output), then `build/{release,debug}/<platform>/logamuffin[.exe]` (the [scripts/build.sh.md](build.sh.md) output). If none is found it exits with an error explaining how to build one.
+The script locates a `logamuffin` binary by `command -v`, then `build/debug/logamuffin` (the [scripts/run_tests.sh.md](run_tests.sh.md) output), then `build/{release,debug}/<platform>/logamuffin[.exe]` (the [scripts/build.sh.md](build.sh.md) output; the platform name comes from the shared `tools/host_platform.sh` helpers). If none is found it exits with an error explaining how to build one.
 
 Demo state is isolated: host `LOG_*`/`LOGAMUFFIN_*` variables are unset up front and output goes to a `mktemp -d` directory that is removed on exit, so running the demo never touches your tree or your real `.logs/log.log`.
 

@@ -1,6 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# _level_to_value <name-or-number> prints the numeric severity:
+# words map through the built-in table (unknown names -> INFO=20),
+# numbers pass through unchanged.
+_level_to_value() {
+    local name="$1"
+    if [[ "$name" =~ ^-?[0-9]+$ ]]; then
+        printf '%s' "$name"
+        return 0
+    fi
+    local upper
+    upper="$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]')"
+    case "$upper" in
+    TRACE) printf 5 ;;
+    DEBUG) printf 10 ;;
+    INFO) printf 20 ;;
+    WARNING | WARN) printf 30 ;;
+    ERROR) printf 40 ;;
+    CRITICAL | FATAL) printf 50 ;;
+    ALWAYS) printf -- -1 ;;
+    *) printf 20 ;;
+    esac
+}
+
 ENTRY_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$ENTRY_DIR/env.sh"
@@ -46,41 +69,13 @@ log() {
         local level_arg="${1:-}"
         shift
         local msg="$*"
-        local level_upper level_value _thr_raw _thr_upper
-        if [[ "$level_arg" =~ ^-?[0-9]+$ ]]; then
-            level_value="$level_arg"
-        else
-            level_upper="$(printf '%s' "$level_arg" | tr '[:lower:]' '[:upper:]')"
-            case "$level_upper" in
-            TRACE) level_value=5 ;;
-            DEBUG) level_value=10 ;;
-            INFO) level_value=20 ;;
-            WARNING | WARN) level_value=30 ;;
-            ERROR) level_value=40 ;;
-            CRITICAL | FATAL) level_value=50 ;;
-            ALWAYS) level_value=-1 ;;
-            *) level_value=20 ;;
-            esac
-        fi
-        _thr_raw="${LOG_LEVEL:-${LOGAMUFFIN_LEVEL:-INFO}}"
+        local level_value threshold_value
+        level_value="$(_level_to_value "$level_arg")"
+        local _thr_raw="${LOG_LEVEL:-${LOGAMUFFIN_LEVEL:-INFO}}"
         if [[ -z "$_thr_raw" ]]; then
             _thr_raw="INFO"
         fi
-        if [[ "$_thr_raw" =~ ^-?[0-9]+$ ]]; then
-            local threshold_value="$_thr_raw"
-        else
-            _thr_upper="$(printf '%s' "$_thr_raw" | tr '[:lower:]' '[:upper:]')"
-            case "$_thr_upper" in
-            TRACE) threshold_value=5 ;;
-            DEBUG) threshold_value=10 ;;
-            INFO) threshold_value=20 ;;
-            WARNING | WARN) threshold_value=30 ;;
-            ERROR) threshold_value=40 ;;
-            CRITICAL | FATAL) threshold_value=50 ;;
-            ALWAYS) threshold_value=-1 ;;
-            *) threshold_value=20 ;;
-            esac
-        fi
+        threshold_value="$(_level_to_value "$_thr_raw")"
         if [[ "$level_value" -ne -1 && "$level_value" -lt "$threshold_value" ]]; then
             return 0
         fi

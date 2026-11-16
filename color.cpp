@@ -173,6 +173,12 @@ namespace logamuffin
       return false;
     }
 
+    // Truecolor escape for #RRGGBB / #RGB.
+    std::string truecolor_escape(int red, int green, int blue)
+    {
+      return "\x1b[38;2;" + std::to_string(red) + ";" + std::to_string(green) + ";" + std::to_string(blue) + "m";
+    }
+
     // Expands literal escape text ("\033", "\e", "\x1b") to real ESC bytes
     // so specs typed in shell/config files without a raw ESC still work.
     std::string expand_literal_escape_text(const std::string& text)
@@ -313,7 +319,7 @@ namespace logamuffin
         const int red   = parse_hex_pair(hexDigits[0], hexDigits[1]);
         const int green = parse_hex_pair(hexDigits[2], hexDigits[3]);
         const int blue  = parse_hex_pair(hexDigits[4], hexDigits[5]);
-        outEscape       = "\x1b[38;2;" + std::to_string(red) + ";" + std::to_string(green) + ";" + std::to_string(blue) + "m";
+        outEscape       = truecolor_escape(red, green, blue);
         return true;
       }
       if (hexDigits.size() == kHexShortLength && digits_valid(hexDigits))
@@ -321,7 +327,7 @@ namespace logamuffin
         const int red   = hex_digit_value(hexDigits[0]) * kHexShortExpand;
         const int green = hex_digit_value(hexDigits[1]) * kHexShortExpand;
         const int blue  = hex_digit_value(hexDigits[2]) * kHexShortExpand;
-        outEscape       = "\x1b[38;2;" + std::to_string(red) + ";" + std::to_string(green) + ";" + std::to_string(blue) + "m";
+        outEscape       = truecolor_escape(red, green, blue);
         return true;
       }
       err = "invalid color '" + specRaw + "'";

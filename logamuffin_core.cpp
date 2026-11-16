@@ -23,30 +23,46 @@ namespace logamuffin
     // Index of INFO in kBuiltinLevels for info() fallback.
     constexpr std::size_t kInfoFallbackIndex = 3;
 
+    // Linear scan over kBuiltinLevels; every lookup is a predicate over it.
+    template<typename Pred>
+    const LevelInfo* find_builtin(Pred pred)
+    {
+      for (const auto& entry: kBuiltinLevels)
+      {
+        if (pred(entry))
+        {
+          return &entry;
+        }
+      }
+      return nullptr;
+    }
+
     // Name/numeric → Level derived from the single kBuiltinLevels table in
     // logamuffin.hpp. Aliases (WARNING→WARN, FATAL→CRITICAL) are single-sourced
     // in log_levels.hpp (kLevelAliases). Numeric forms map to built-ins only;
     // custom numeric levels are handled by resolve_level() in logamuffin.cpp.
     bool lookup_level_name(std::string_view upperValue, Level& out)
     {
-      for (const auto& entry: kBuiltinLevels)
+      if (const LevelInfo* hit = find_builtin(
+                  [&](const LevelInfo& entry)
+                  {
+                    return upperValue == entry.name;
+                  }))
       {
-        if (upperValue == entry.name)
-        {
-          out = entry.level;
-          return true;
-        }
+        out = hit->level;
+        return true;
       }
       // Aliases consult the single-source table in log_levels.hpp.
       if (const auto canonical = level_alias_target(upperValue); !canonical.empty())
       {
-        for (const auto& entry: kBuiltinLevels)
+        if (const LevelInfo* hit = find_builtin(
+                    [&](const LevelInfo& entry)
+                    {
+                      return canonical == entry.name;
+                    }))
         {
-          if (canonical == entry.name)
-          {
-            out = entry.level;
-            return true;
-          }
+          out = hit->level;
+          return true;
         }
       }
       // Numeric built-in values (-1, 5, 10, 20, 30, 40, 50). Guard against
@@ -54,13 +70,14 @@ namespace logamuffin
       int numeric = 0;
       if (trim(std::string(upperValue)) == upperValue && parse_int_strict(std::string(upperValue), numeric))
       {
-        for (const auto& entry: kBuiltinLevels)
+        if (const LevelInfo* hit = find_builtin(
+                    [&](const LevelInfo& entry)
+                    {
+                      return numeric == static_cast<int>(entry.level);
+                    }))
         {
-          if (numeric == static_cast<int>(entry.level))
-          {
-            out = entry.level;
-            return true;
-          }
+          out = hit->level;
+          return true;
         }
       }
       return false;
@@ -214,50 +231,36 @@ namespace logamuffin
   std::string format_console_output(std::string_view time, std::string_view host, const LogLevel& level, std::string_view source, std::string_view message, bool color, int width)
   {
     std::string prefix;
+    const std::string sourceField = std::string(source) + ":";
+
+    // Appends one prefix field: ANSI-wrapped when color is on, plain text
+    // otherwise; either way a single trailing space separates fields. The
+    // source field carries its trailing colon inside `text` in both modes.
+    const auto addField = [&](std::string& out, std::string_view ansi, const std::string_view text)
+    {
+      if (color)
+      {
+        out += ansi;
+        out += text;
+        out += ANSI_RESET;
+        out += ' ';
+      }
+      else
+      {
+        out += text;
+        out += ' ';
+      }
+    };
 
     if (width >= kFullFormatWidth)
     {
-      if (color)
-      {
-        prefix += ANSI_GREEN;
-        prefix += time;
-        prefix += ANSI_RESET;
-        prefix += ' ';
-        prefix += ANSI_PURPLE;
-        prefix += host;
-        prefix += ANSI_RESET;
-        prefix += ' ';
-        prefix += ANSI_BLUE;
-        prefix += source;
-        prefix += ':';
-        prefix += ANSI_RESET;
-        prefix += ' ';
-      }
-      else
-      {
-        prefix += time;
-        prefix += " ";
-        prefix += host;
-        prefix += " ";
-        prefix += source;
-        prefix += ": ";
-      }
+      addField(prefix, ANSI_GREEN, time);
+      addField(prefix, ANSI_PURPLE, host);
+      addField(prefix, ANSI_BLUE, sourceField);
     }
     else if (width >= kMediumFormatWidth)
     {
-      if (color)
-      {
-        prefix += ANSI_BLUE;
-        prefix += source;
-        prefix += ':';
-        prefix += ANSI_RESET;
-        prefix += ' ';
-      }
-      else
-      {
-        prefix += source;
-        prefix += ": ";
-      }
+      addField(prefix, ANSI_BLUE, sourceField);
     }
 
     if (color)
