@@ -128,21 +128,62 @@ namespace
     return std::nullopt;
   }
 
-  void report_config_missing_path()
-  {
-    std::cerr << kConfigMissingPathMessage;
-  }
-
-  // ---------------------------------------------------------------------------
-  // CLI parsing (leading options + --config after LEVEL)
-  // ---------------------------------------------------------------------------
-
   struct ParsedArgs
   {
     std::optional<std::string> cliConfigPath;
     int levelIndex   = 1;
     int messageStart = 1;
   };
+
+  void report_config_missing_path()
+  {
+    std::cerr << kConfigMissingPathMessage;
+  }
+
+  enum class ConfigFlagResult
+  {
+    NotConfig, // arg is not a --config/--config=<path> flag
+    Ok,        // flag applied (out.cliConfigPath set, skip tokens consumed)
+    Fatal,     // flag was malformed (usage error already reported)
+  };
+
+  // Parses `arg` as a --config/--config=<path> option. `valueIdx` is the
+  // index of the token after arg (where a "--config <path>" value would
+  // live); on Ok, `skip` says how many extra tokens were consumed (0 for
+  // the = form, 1 for the two-token form).
+  ConfigFlagResult apply_config_flag(const std::string& arg, int argc, char* argv[], int valueIdx, ParsedArgs& out, int& exitCode, int& skip)
+  {
+    const auto cfgPath = config_flag_path(arg);
+    if (!cfgPath.has_value())
+    {
+      return ConfigFlagResult::NotConfig;
+    }
+    if (arg == "--config")
+    {
+      if (valueIdx >= argc)
+      {
+        report_config_missing_path();
+        exitCode = 2;
+        return ConfigFlagResult::Fatal;
+      }
+      out.cliConfigPath = argv[valueIdx];
+      skip              = 1;
+      return ConfigFlagResult::Ok;
+    }
+    if (cfgPath->empty())
+    {
+      report_config_missing_path();
+      exitCode = 2;
+      return ConfigFlagResult::Fatal;
+    }
+    out.cliConfigPath = *cfgPath;
+    skip              = 0;
+    return ConfigFlagResult::Ok;
+  }
+
+  // ---------------------------------------------------------------------------
+  // CLI parsing (leading options + --config after LEVEL)
+  // ---------------------------------------------------------------------------
 
   // Parses CLI args into ParsedArgs. Returns false when run() should return
   // immediately with exitCode (error/help/version already printed);
@@ -181,30 +222,20 @@ namespace
         wantHelp = true;
         continue;
       }
-      if (const auto cfgPath = config_flag_path(arg); cfgPath.has_value())
       {
-        if (arg == "--config")
+        // --config <path> | --config=<path>: applies and consumes the
+        // flag (and its value token) when present.
+        int skip                = 0;
+        const auto configResult = apply_config_flag(arg, argc, argv, idx + 1, out, exitCode, skip);
+        if (configResult == ConfigFlagResult::Fatal)
         {
-          if (idx + 1 >= argc)
-          {
-            report_config_missing_path();
-            exitCode = 2;
-            return false;
-          }
-          out.cliConfigPath = argv[idx + 1];
-          ++idx; // consumed path
+          return false;
         }
-        else
+        if (configResult == ConfigFlagResult::Ok)
         {
-          if (cfgPath->empty())
-          {
-            report_config_missing_path();
-            exitCode = 2;
-            return false;
-          }
-          out.cliConfigPath = *cfgPath;
+          idx += skip; // consume the value token for the two-word form
+          continue;
         }
-        continue;
       }
       {
         int numericCandidate = 0;
@@ -234,43 +265,19 @@ namespace
 
     // Also accept --config immediately after LEVEL (before MESSAGE),
     // e.g. `logamuffin INFO --config file.json "message"`.
-    int messageStart = 0;
+    int messageStart = idx + 1;
     if (idx < argc && idx + 1 < argc)
     {
-      const std::string afterLevel = argv[idx + 1];
-      if (const auto cfgPath = config_flag_path(afterLevel); cfgPath.has_value())
+      int skip                = 0;
+      const auto configResult = apply_config_flag(argv[idx + 1], argc, argv, idx + 2, out, exitCode, skip);
+      if (configResult == ConfigFlagResult::Fatal)
       {
-        if (afterLevel == "--config")
-        {
-          if (idx + 2 >= argc)
-          {
-            report_config_missing_path();
-            exitCode = 2;
-            return false;
-          }
-          out.cliConfigPath = argv[idx + 2];
-          messageStart      = idx + 3;
-        }
-        else
-        {
-          if (cfgPath->empty())
-          {
-            report_config_missing_path();
-            exitCode = 2;
-            return false;
-          }
-          out.cliConfigPath = *cfgPath;
-          messageStart      = idx + 2;
-        }
+        return false;
       }
-      else
+      if (configResult == ConfigFlagResult::Ok)
       {
-        messageStart = idx + 1;
+        messageStart = idx + 2 + skip;
       }
-    }
-    else
-    {
-      messageStart = idx + 1;
     }
 
     out.levelIndex   = idx;

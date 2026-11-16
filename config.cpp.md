@@ -31,6 +31,8 @@ bool load_config(const std::optional<std::string>& cliConfigPath, Config& cfg, s
 3. Environment overrides — `LOG_LEVELS`/`LOG_CATEGORIES` (and `LOGAMUFFIN_*` equivalents), per-category `LOG_LEVEL_VALUE_<NAME>`/`LOG_LEVEL_COLOR_<NAME>` (both documented spellings), then scalars `LOG_LEVEL`, `LOG_COLOR`, `LOG_FILE`, `LOG_SOURCE`.
 4. Threshold resolution — thresholds may name a category or be numeric; named thresholds resolve against the configured values.
 
+The module is organized as small single-responsibility helpers (`parse_level_entry` splits into `split_entry_name_rest`/`parse_level_fields`; the env-override path into `apply_levels_json_env`/`apply_per_category_value`/`apply_per_category_color`; threshold resolution into `apply_env_string`), each independently followable; `load_config` itself stays a short sequence of pipeline stages.
+
 Colors pass through [color.cpp.md](color.cpp.md)'s `resolve_color()`; integers through [text_utils.cpp.md](text_utils.cpp.md)'s strict parsers.
 
 ## Where it is used

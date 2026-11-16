@@ -211,6 +211,36 @@ class LogamuffinTestCase(unittest.TestCase):
     def read_log(self) -> str:
         return read_log_file(self.log_file)
 
+    def run_with_log(
+        self,
+        log_name: str,
+        args: list[str],
+        **env_overrides: str | None,
+    ) -> tuple[subprocess.CompletedProcess, Path]:
+        """Run the binary with LOG_FILE pointed at a named temp file."""
+        log = self.dir / log_name
+        result = self.run_bin(args, LOG_FILE=str(log), **env_overrides)
+        return result, log
+
+    def assert_aliases_render_label(
+        self,
+        aliases: tuple[str, ...],
+        expected_label: str,
+    ) -> None:
+        """Every alias must render the same [LABEL] in the file log."""
+        for alias in aliases:
+            with self.subTest(alias=alias):
+                result, log = self.run_with_log(
+                    f"{expected_label.lower()}-{alias}.log",
+                    [alias, f"alias-{alias}"],
+                    LOG_LEVEL="TRACE",
+                    LOG_COLOR=COLOR_PLAIN,
+                )
+                self.assertEqual(result.returncode, 0)
+                content = read_log_file(log)
+                self.assertIn(f"[{expected_label}]", content)
+                self.assertIn(f"alias-{alias}", content)
+
     # ------------------------------------------------------------------
     # Assertion helpers (arrange: env -> run -> assert in one line)
     # ------------------------------------------------------------------
@@ -306,35 +336,10 @@ class TestSeverityAliasesAndFiltering(LogamuffinTestCase):
                 self.assertIn(f"lvl-{level}", self.read_log())
 
     def test_warn_and_warning_aliases_produce_same_label(self) -> None:
-        for alias in WARN_ALIASES:
-            with self.subTest(alias=alias):
-                log = self.dir / f"warn-{alias}.log"
-                result = self.run_bin(
-                    [alias, f"warn-{alias}"],
-                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN,
-                    LOG_FILE=str(log),
-                )
-                self.assertEqual(result.returncode, 0)
-                content = log.read_text(
-                    encoding="utf-8", errors="replace"
-                )
-                self.assertIn("[WARN]", content)
-                self.assertIn(f"warn-{alias}", content)
+        self.assert_aliases_render_label(WARN_ALIASES, "WARN")
 
     def test_fatal_and_critical_aliases_produce_same_label(self) -> None:
-        for alias in CRITICAL_ALIASES:
-            with self.subTest(alias=alias):
-                log = self.dir / f"crit-{alias}.log"
-                result = self.run_bin(
-                    [alias, f"crit-{alias}"],
-                    LOG_LEVEL="TRACE", LOG_COLOR=COLOR_PLAIN,
-                    LOG_FILE=str(log),
-                )
-                self.assertEqual(result.returncode, 0)
-                content = log.read_text(
-                    encoding="utf-8", errors="replace"
-                )
-                self.assertIn("[CRITICAL]", content)
+        self.assert_aliases_render_label(CRITICAL_ALIASES, "CRITICAL")
 
     def test_default_threshold_filters_below_info(self) -> None:
         # No LOG_LEVEL override: the default is INFO.
@@ -352,12 +357,11 @@ class TestSeverityAliasesAndFiltering(LogamuffinTestCase):
     def test_log_level_override_controls_filtering(self) -> None:
         for threshold, level, expected_kept in THRESHOLD_FILTER_CASES:
             with self.subTest(threshold=threshold, level=level):
-                log = self.dir / f"filt-{threshold}-{level}.log"
-                result = self.run_bin(
+                result, log = self.run_with_log(
+                    f"filt-{threshold}-{level}.log",
                     [level, f"m-{threshold}-{level}"],
                     LOG_LEVEL=threshold,
                     LOG_COLOR=COLOR_PLAIN,
-                    LOG_FILE=str(log),
                 )
                 self.assertEqual(result.returncode, 0)
                 content = read_log_file(log)
@@ -367,10 +371,11 @@ class TestSeverityAliasesAndFiltering(LogamuffinTestCase):
                     self.assertNotIn(f"m-{threshold}-{level}", content)
 
     def test_always_bypasses_any_threshold(self) -> None:
-        log = self.dir / "always.log"
-        result = self.run_bin(
+        result, log = self.run_with_log(
+            "always.log",
             ["ALWAYS", "always-bypass"],
-            LOG_LEVEL="CRITICAL", LOG_COLOR=COLOR_PLAIN, LOG_FILE=str(log),
+            LOG_LEVEL="CRITICAL",
+            LOG_COLOR=COLOR_PLAIN,
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("always-bypass", result.stdout)

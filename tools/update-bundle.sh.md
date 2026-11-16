@@ -44,6 +44,8 @@ Not meant to be run directly — use the bundle's own `update.sh` (for example `
 
 Flags: `--dry-run` lists the assets without touching anything; `--tag TAG` pins a release; `--repo REPO` overrides the slug. Logging comes from [../scripts/entry.sh.md](../scripts/entry.sh.md); the wrapper paths keep `--dry-run` output identical to a direct run.
 
+Checksum verification runs as `verify_downloads` (honoring `TOOL_CHECKSUMS_REQUIRED`), and the post-swap host smoke test runs as `check_host_binary` — both are functions in the shared script, not inline blocks, so the main flow stays a short sequence of download → verify → stage → swap → smoke-test.
+
 ## Related pages
 
 - [README.md](README.md) — the bundle index and refresh instructions
