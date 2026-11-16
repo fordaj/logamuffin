@@ -24,7 +24,7 @@ flowchart TD
 
 ## `logamuffin.cpp` — CLI and I/O
 
-`main()` → `run()`: parses `--config`/`--help`/`--version` and `LEVEL MESSAGE…` (`parse_cli_args()`), calls [config.cpp.md](config.cpp.md)'s `load_config()`, resolves the level argument against the registry (`resolve_level()`, falling back to `[<n>]` ad-hoc levels for unknown numbers), then `emit_console_line()` (stdout below value 40, stderr at/above) and `write_file_log()` (append via [platform.cpp.md](platform.cpp.md)'s `append_locked()`). `--help`/`--version`/`--config` exit codes: usage/config errors exit 2.
+`main()` → `run()`: parses `--config`/`--help`/`--version` and `LEVEL MESSAGE…` (`parse_cli_args()`), calls [config.cpp.md](config.cpp.md)'s `load_config()`, resolves the level argument against the registry (`resolve_level()`, falling back to `[<n>]` ad-hoc levels for unknown numbers), then `emit_console_line()` (stdout below value 40, stderr at/above) and `write_file_log()` (append via [platform.cpp.md](platform.cpp.md)'s `append_locked()`). `--help`/`--version`/`--config` exit codes: usage/config errors exit 2. Both `--config` positions (leading options and immediately after LEVEL) are handled by one shared `apply_config_flag()` helper, so the two sites cannot drift apart.
 
 ## Where it is used
 

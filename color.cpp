@@ -179,6 +179,32 @@ namespace logamuffin
       return "\x1b[38;2;" + std::to_string(red) + ";" + std::to_string(green) + ";" + std::to_string(blue) + "m";
     }
 
+    // Matches one of the literal escape spellings at i ("\033", "\e",
+    // "\x1b"/"\X1B") and returns its length in bytes, or 0 when none does.
+    std::size_t literal_escape_token_length(const std::string& text, std::size_t i)
+    {
+      if (text[i] != '\\' || i + 1 >= text.size())
+      {
+        return 0;
+      }
+      // "\033" (4 chars).
+      if (text[i + 1] == '0' && i + 3 < text.size() && text[i + 2] == '3' && text[i + 3] == '3')
+      {
+        return 4;
+      }
+      // "\e" (2 chars).
+      if (text[i + 1] == 'e')
+      {
+        return 2;
+      }
+      // "\x1b" / "\X1B" (4 chars).
+      if ((text[i + 1] == 'x' || text[i + 1] == 'X') && i + 3 < text.size() && text[i + 2] == '1' && (text[i + 3] == 'b' || text[i + 3] == 'B'))
+      {
+        return 4;
+      }
+      return 0;
+    }
+
     // Expands literal escape text ("\033", "\e", "\x1b") to real ESC bytes
     // so specs typed in shell/config files without a raw ESC still work.
     std::string expand_literal_escape_text(const std::string& text)
@@ -187,29 +213,12 @@ namespace logamuffin
       out.reserve(text.size());
       for (std::size_t i = 0; i < text.size();)
       {
-        if (text[i] == '\\' && i + 1 < text.size())
+        const std::size_t token = literal_escape_token_length(text, i);
+        if (token > 0)
         {
-          // "\033" (4 chars).
-          if (text[i + 1] == '0' && i + 3 < text.size() && text[i + 2] == '3' && text[i + 3] == '3')
-          {
-            out += kEscapeChar;
-            i += 4;
-            continue;
-          }
-          // "\e" (2 chars).
-          if (text[i + 1] == 'e')
-          {
-            out += kEscapeChar;
-            i += 2;
-            continue;
-          }
-          // "\x1b" / "\X1B" (4 chars).
-          if ((text[i + 1] == 'x' || text[i + 1] == 'X') && i + 3 < text.size() && text[i + 2] == '1' && (text[i + 3] == 'b' || text[i + 3] == 'B'))
-          {
-            out += kEscapeChar;
-            i += 4;
-            continue;
-          }
+          out += kEscapeChar;
+          i += token;
+          continue;
         }
         out += text[i++];
       }
@@ -263,6 +272,119 @@ namespace logamuffin
       return true;
     }
 
+    // Parses #RRGGBB (kHexLongLength) or #RGB (kHexShortLength) into
+    // components. False on a bad shape or non-hex digits.
+    bool hex_to_rgb(const std::string& hexDigits, int& red, int& green, int& blue)
+    {
+      if (hexDigits.size() == kHexLongLength && digits_valid(hexDigits))
+      {
+        red   = parse_hex_pair(hexDigits[0], hexDigits[1]);
+        green = parse_hex_pair(hexDigits[2], hexDigits[3]);
+        blue  = parse_hex_pair(hexDigits[4], hexDigits[5]);
+        return true;
+      }
+      if (hexDigits.size() == kHexShortLength && digits_valid(hexDigits))
+      {
+        red   = hex_digit_value(hexDigits[0]) * kHexShortExpand;
+        green = hex_digit_value(hexDigits[1]) * kHexShortExpand;
+        blue  = hex_digit_value(hexDigits[2]) * kHexShortExpand;
+        return true;
+      }
+      return false;
+    }
+
+    // Result of one spec-form attempt: NotThisForm means "try the next
+    // form"; Resolved/Invalid mean the form matched and decided the outcome.
+    enum class ColorFormResult
+    {
+      NotThisForm,
+      Resolved,
+      Invalid,
+    };
+
+    // "\x1b[0;31m" — full escape sequence containing a real ESC byte.
+    ColorFormResult resolve_escape_form(const std::string& spec, const std::string& specRaw, std::string& outEscape, std::string& err)
+    {
+      if (spec.find(kEscapeChar) == std::string::npos)
+      {
+        return ColorFormResult::NotThisForm;
+      }
+      if (!ends_with_sgr_terminator(spec))
+      {
+        err = "invalid color '" + specRaw + "'";
+        return ColorFormResult::Invalid;
+      }
+      outEscape = spec;
+      return ColorFormResult::Resolved;
+    }
+
+    // "\033" / "\e" / "\x1b" literal text (shell-typed, no raw ESC). A
+    // backslash that expands to no ESC is invalid, not a name.
+    ColorFormResult resolve_literal_escape_form(const std::string& spec, const std::string& specRaw, std::string& outEscape, std::string& err)
+    {
+      if (spec.find('\\') == std::string::npos)
+      {
+        return ColorFormResult::NotThisForm;
+      }
+      const std::string expanded = expand_literal_escape_text(spec);
+      if (expanded.find(kEscapeChar) == std::string::npos || !ends_with_sgr_terminator(expanded))
+      {
+        err = "invalid color '" + specRaw + "'";
+        return ColorFormResult::Invalid;
+      }
+      outEscape = expanded;
+      return ColorFormResult::Resolved;
+    }
+
+    // "[0;31m" bracket form without ESC.
+    ColorFormResult resolve_bracket_form(const std::string& spec, const std::string& specRaw, std::string& outEscape, std::string& err)
+    {
+      if (spec.front() != '[' || spec.back() != 'm')
+      {
+        return ColorFormResult::NotThisForm;
+      }
+      const std::string inner = spec.substr(1, spec.size() - 2);
+      if (!is_sgr_code_text(inner))
+      {
+        err = "invalid color '" + specRaw + "'";
+        return ColorFormResult::Invalid;
+      }
+      outEscape = std::string(1, kEscapeChar) + spec;
+      return ColorFormResult::Resolved;
+    }
+
+    // "#rrggbb" or "#rgb" hex truecolor.
+    ColorFormResult resolve_hex_form(const std::string& spec, const std::string& specRaw, std::string& outEscape, std::string& err)
+    {
+      if (spec.front() != '#')
+      {
+        return ColorFormResult::NotThisForm;
+      }
+      int red   = 0;
+      int green = 0;
+      int blue  = 0;
+      if (!hex_to_rgb(spec.substr(1), red, green, blue))
+      {
+        err = "invalid color '" + specRaw + "'";
+        return ColorFormResult::Invalid;
+      }
+      outEscape = truecolor_escape(red, green, blue);
+      return ColorFormResult::Resolved;
+    }
+
+    // "31", "0;31", "1;91" — bare SGR code (',' accepted as ';').
+    ColorFormResult resolve_sgr_form(const std::string& spec, const std::string& /*specRaw*/, std::string& outEscape, std::string& /*err*/)
+    {
+      if (!is_sgr_code_text(spec))
+      {
+        return ColorFormResult::NotThisForm;
+      }
+      std::string code = spec;
+      std::replace(code.begin(), code.end(), ',', ';');
+      outEscape = std::string(1, kEscapeChar) + code + "m";
+      return ColorFormResult::Resolved;
+    }
+
   } // namespace
 
   bool resolve_color(const std::string& specRaw, std::string& outEscape, std::string& err)
@@ -274,72 +396,22 @@ namespace logamuffin
       return false;
     }
     // Precedence: esc -> literal esc -> bracket -> hex -> bare SGR -> named.
-    // Full escape sequence containing a real ESC byte (e.g. "\033[0;31m").
-    if (spec.find(kEscapeChar) != std::string::npos)
+    // The first form to claim the spec decides the outcome.
+    using Resolver             = ColorFormResult (*)(const std::string&, const std::string&, std::string&, std::string&);
+    const Resolver resolvers[] = {
+      resolve_escape_form, resolve_literal_escape_form, resolve_bracket_form, resolve_hex_form, resolve_sgr_form,
+    };
+    for (const Resolver resolve: resolvers)
     {
-      if (ends_with_sgr_terminator(spec))
+      switch (resolve(spec, specRaw, outEscape, err))
       {
-        outEscape = spec;
-        return true;
+        case ColorFormResult::Resolved:
+          return true;
+        case ColorFormResult::Invalid:
+          return false;
+        case ColorFormResult::NotThisForm:
+          break;
       }
-      err = "invalid color '" + specRaw + "'";
-      return false;
-    }
-    // Literal "\033" / "\e" / "\x1b" text (shell-typed, no raw ESC).
-    if (spec.find('\\') != std::string::npos)
-    {
-      const std::string expanded = expand_literal_escape_text(spec);
-      if (expanded.find(kEscapeChar) != std::string::npos && ends_with_sgr_terminator(expanded))
-      {
-        outEscape = expanded;
-        return true;
-      }
-      // A backslash that expands to no ESC is invalid, not a name.
-      err = "invalid color '" + specRaw + "'";
-      return false;
-    }
-    // "[0;31m" bracket form without ESC.
-    if (!spec.empty() && spec.front() == '[' && spec.back() == 'm')
-    {
-      const std::string inner = spec.substr(1, spec.size() - 2);
-      if (is_sgr_code_text(inner))
-      {
-        outEscape = std::string(1, kEscapeChar) + spec;
-        return true;
-      }
-      err = "invalid color '" + specRaw + "'";
-      return false;
-    }
-    // Hex truecolor: #RRGGBB or #RGB.
-    if (!spec.empty() && spec.front() == '#')
-    {
-      const std::string hexDigits = spec.substr(1);
-      if (hexDigits.size() == kHexLongLength && digits_valid(hexDigits))
-      {
-        const int red   = parse_hex_pair(hexDigits[0], hexDigits[1]);
-        const int green = parse_hex_pair(hexDigits[2], hexDigits[3]);
-        const int blue  = parse_hex_pair(hexDigits[4], hexDigits[5]);
-        outEscape       = truecolor_escape(red, green, blue);
-        return true;
-      }
-      if (hexDigits.size() == kHexShortLength && digits_valid(hexDigits))
-      {
-        const int red   = hex_digit_value(hexDigits[0]) * kHexShortExpand;
-        const int green = hex_digit_value(hexDigits[1]) * kHexShortExpand;
-        const int blue  = hex_digit_value(hexDigits[2]) * kHexShortExpand;
-        outEscape       = truecolor_escape(red, green, blue);
-        return true;
-      }
-      err = "invalid color '" + specRaw + "'";
-      return false;
-    }
-    // Bare SGR code: "31", "0;31", "1;91" (',' accepted as ';').
-    if (is_sgr_code_text(spec))
-    {
-      std::string code = spec;
-      std::replace(code.begin(), code.end(), ',', ';');
-      outEscape = "\x1b[" + code + "m";
-      return true;
     }
     // Named color (case-insensitive, separators ignored via normalize_key()).
     if (color_name_to_escape(normalize_key(spec), outEscape))

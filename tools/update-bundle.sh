@@ -297,25 +297,34 @@ done
 ((${#archives[@]} > 0)) || die "no platform archives downloaded from $REPO $TAG"
 log INFO "downloaded ${#archives[@]} platform archives"
 
-checksums_file=""
-for candidate in checksums.txt SHA256SUMS.txt; do
-    if [[ -f "$TMP_DIR/$candidate" ]]; then
-        checksums_file="$TMP_DIR/$candidate"
-        break
+# Verify the downloaded archives against checksums.txt/SHA256SUMS.txt when
+# the release ships one; honors TOOL_CHECKSUMS_REQUIRED otherwise. Archives
+# are verified by name (the checksums file may be cumulative across
+# releases), so only this run's assets are checked.
+verify_downloads() {
+    local checksums_file="" candidate
+    for candidate in checksums.txt SHA256SUMS.txt; do
+        if [[ -f "$TMP_DIR/$candidate" ]]; then
+            checksums_file="$TMP_DIR/$candidate"
+            break
+        fi
+    done
+    if [[ -z "$checksums_file" ]]; then
+        if [[ "$TOOL_CHECKSUMS_REQUIRED" == "1" ]]; then
+            die "no checksums.txt/SHA256SUMS.txt in $TAG release; refusing to install unverified binaries"
+        fi
+        log WARNING "no checksums in $TAG release; skipping verification"
+        return 0
     fi
-done
-if [[ -n "$checksums_file" ]]; then
     log INFO "verifying checksums ($(basename "$checksums_file"))..."
-    # The checksums file may be cumulative across releases (or list every
-    # uploaded asset), so verify only the archives downloaded for this run.
-    checksum_tool=""
+    local checksum_tool="" archive base
     if command -v shasum >/dev/null 2>&1; then
         checksum_tool="shasum -a 256"
     elif command -v sha256sum >/dev/null 2>&1; then
         checksum_tool="sha256sum"
     fi
     [[ -n "$checksum_tool" ]] || die "checksums file present but neither shasum nor sha256sum found"
-    verify_list="$TMP_DIR/.verify-list"
+    local verify_list="$TMP_DIR/.verify-list"
     : >"$verify_list"
     for archive in "${archives[@]}"; do
         base="$(basename "$archive")"
@@ -325,12 +334,9 @@ if [[ -n "$checksums_file" ]]; then
     # Entries are "<sha>  <name>" (or with a leading *), relative to $TMP_DIR.
     (cd "$TMP_DIR" && $checksum_tool -c "$verify_list") || die "checksum verification failed for $TAG"
     log INFO "checksums verified"
-else
-    if [[ "$TOOL_CHECKSUMS_REQUIRED" == "1" ]]; then
-        die "no checksums.txt/SHA256SUMS.txt in $TAG release; refusing to install unverified binaries"
-    fi
-    log WARNING "no checksums in $TAG release; skipping verification"
-fi
+}
+
+verify_downloads
 
 # Extract one archive into a destination directory, format-agnostic.
 extract_archive() {
@@ -424,36 +430,41 @@ for dir in "$TOOL_ROOT"/v*/; do
 done
 
 # Best-effort host verification: run the bundled binary for this machine.
-host_os_raw="$(uname -s | tr '[:upper:]' '[:lower:]')"
-host_arch_raw="$(uname -m | tr '[:upper:]' '[:lower:]')"
-case "$host_os_raw" in
-darwin*) host_os="macos" ;;
-linux*) host_os="linux" ;;
-msys* | mingw* | cygwin* | windows* | win*) host_os="windows" ;;
-*) host_os="$host_os_raw" ;;
-esac
-case "$host_arch_raw" in
-x86_64 | amd64) host_arch="x86_64" ;;
-arm64 | aarch64) host_arch="arm64" ;;
-*) host_arch="$host_arch_raw" ;;
-esac
-host_platform="$host_os-$host_arch"
-host_bin=""
-for cand in "$TAG_DIR/$host_platform/$TOOL_BIN" "$TAG_DIR/$host_platform/$TOOL_BIN.exe"; do
-    if [[ -x "$cand" ]]; then
-        host_bin="$cand"
+check_host_binary() {
+    local host_os_raw host_arch_raw host_os host_arch host_platform host_bin cand host_ver
+    host_os_raw="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    host_arch_raw="$(uname -m | tr '[:upper:]' '[:lower:]')"
+    case "$host_os_raw" in
+    darwin*) host_os="macos" ;;
+    linux*) host_os="linux" ;;
+    msys* | mingw* | cygwin* | windows* | win*) host_os="windows" ;;
+    *) host_os="$host_os_raw" ;;
+    esac
+    case "$host_arch_raw" in
+    x86_64 | amd64) host_arch="x86_64" ;;
+    arm64 | aarch64) host_arch="arm64" ;;
+    *) host_arch="$host_arch_raw" ;;
+    esac
+    host_platform="$host_os-$host_arch"
+    host_bin=""
+    for cand in "$TAG_DIR/$host_platform/$TOOL_BIN" "$TAG_DIR/$host_platform/$TOOL_BIN.exe"; do
+        if [[ -x "$cand" ]]; then
+            host_bin="$cand"
+        fi
+    done
+    if [[ -z "$host_bin" ]]; then
+        log WARNING "host platform $host_platform not in bundle; skipped version check"
+        return 0
     fi
-done
-if [[ -n "$host_bin" ]]; then
     host_ver="$("$host_bin" --version 2>&1 || true)"
     log INFO "host binary $host_platform reports: $host_ver"
     case "$host_ver" in
     *"$TAG"* | *"${TAG#v}"*) ;;
     *) log WARNING "host binary version '$host_ver' does not contain $TAG" ;;
     esac
-else
-    log WARNING "host platform $host_platform not in bundle; skipped version check"
-fi
+}
+
+check_host_binary
 
 log INFO "done: $TAG_DIR now contains:"
 for dir in "$TAG_DIR"/*/; do

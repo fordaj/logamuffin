@@ -82,45 +82,41 @@ namespace logamuffin
     // Grammar: NAME (=|:) [VALUE[:COLOR] | COLOR | VALUE]. Value forms are
     // tried before color forms so numeric strings bind to value, not color.
 
-    bool parse_level_entry(const std::string& rawEntry, std::string& outName, LevelFields& outFields, std::string& err)
+    // Splits NAME from the rest of an entry at the first separator: when
+    // both '=' and ':' are present, the earlier one wins. When the name
+    // carries no separator, the rest is empty.
+    void split_entry_name_rest(const std::string& entry, std::string& outName, std::string& outRest)
     {
-      const std::string entry = trim(rawEntry);
-      if (entry.empty())
-      {
-        err = "empty log level entry";
-        return false;
-      }
-      // Split name from rest at the first separator that precedes the other.
       const std::size_t eqPos    = entry.find('=');
       const std::size_t colonPos = entry.find(':');
-      std::string namePart;
-      std::string restPart;
-      if (eqPos != std::string::npos && (colonPos == std::string::npos || eqPos < colonPos))
+      const std::size_t sep      = (eqPos != std::string::npos && (colonPos == std::string::npos || eqPos < colonPos)) ? eqPos : colonPos;
+      if (sep == std::string::npos)
       {
-        namePart = entry.substr(0, eqPos);
-        restPart = trim(entry.substr(eqPos + 1));
+        outName = entry;
+        outRest = "";
+        return;
       }
-      else if (colonPos != std::string::npos)
+      outName = entry.substr(0, sep);
+      outRest = trim(entry.substr(sep + 1));
+    }
+
+    // Resolves a color in a level entry, prefixing the error with context.
+    bool resolve_entry_color(const std::string& entry, const std::string& colorPart, std::string& outEscape, std::string& err)
+    {
+      std::string colorErr;
+      if (!resolve_color(colorPart, outEscape, colorErr))
       {
-        namePart = entry.substr(0, colonPos);
-        restPart = trim(entry.substr(colonPos + 1));
-      }
-      else
-      {
-        namePart = entry;
-        restPart = "";
-      }
-      outName = uppercase(trim(namePart));
-      if (!valid_level_name(outName))
-      {
-        err = "invalid log level name '" + trim(namePart) + "'";
+        err = "invalid log level entry '" + entry + "': " + colorErr;
         return false;
       }
-      outFields = LevelFields{};
-      if (restPart.empty())
-      {
-        return true;
-      }
+      return true;
+    }
+
+    // Parses the "VALUE[:COLOR]" / "COLOR" / "VALUE" remainder of a level
+    // entry. Value forms are tried before color forms so numeric strings
+    // bind to value, not color.
+    bool parse_level_fields(const std::string& entry, const std::string& restPart, LevelFields& outFields, std::string& err)
+    {
       // VALUE:COLOR form — a second colon separates value from color.
       if (const std::size_t secondColon = restPart.find(':'); secondColon != std::string::npos)
       {
@@ -133,14 +129,12 @@ namespace logamuffin
           return false;
         }
         std::string escape;
-        std::string colorErr;
-        if (!resolve_color(colorPart, escape, colorErr))
+        if (!resolve_entry_color(entry, colorPart, escape, err))
         {
-          err = "invalid log level entry '" + entry + "': " + colorErr;
           return false;
         }
         outFields.value = value;
-        outFields.color = escape;
+        outFields.color = std::move(escape);
         return true;
       }
       // Single trailing token: numeric → value, otherwise → color.
@@ -150,14 +144,38 @@ namespace logamuffin
         return true;
       }
       std::string escape;
-      std::string colorErr;
-      if (!resolve_color(restPart, escape, colorErr))
+      if (!resolve_entry_color(entry, restPart, escape, err))
       {
-        err = "invalid log level entry '" + entry + "': " + colorErr;
         return false;
       }
-      outFields.color = escape;
+      outFields.color = std::move(escape);
       return true;
+    }
+
+    bool parse_level_entry(const std::string& rawEntry, std::string& outName, LevelFields& outFields, std::string& err)
+    {
+      const std::string entry = trim(rawEntry);
+      if (entry.empty())
+      {
+        err = "empty log level entry";
+        return false;
+      }
+      std::string name;
+      std::string restPart;
+      split_entry_name_rest(entry, name, restPart);
+      const std::string nameTrim = trim(name);
+      outName                    = uppercase(nameTrim);
+      if (!valid_level_name(outName))
+      {
+        err = "invalid log level name '" + nameTrim + "'";
+        return false;
+      }
+      outFields = LevelFields{};
+      if (restPart.empty())
+      {
+        return true;
+      }
+      return parse_level_fields(entry, restPart, outFields, err);
     }
 
     // ---------------------------------------------------------------------------
@@ -233,13 +251,9 @@ namespace logamuffin
           }
           fields.color = escape;
         }
-        else if (key == "name")
-        {
-          continue; // name comes from the object key / "name" field
-        }
         else
         {
-          continue; // ignore unknown fields for forward compatibility
+          continue; // ignore "name" and unknown fields for forward compatibility
         }
       }
       return true;
@@ -520,6 +534,48 @@ namespace logamuffin
       return entries;
     }
 
+    // Returns the "levels" member of a top-level JSON object (any of the
+    // accepted key spellings), or nullptr when the root is not such an
+    // object.
+    const JsonValue* levels_member(const JsonValue& root)
+    {
+      if (!root.isObject())
+      {
+        return nullptr;
+      }
+      for (const auto& kv: root.objectValue)
+      {
+        if (matches_any(normalize_key(kv.first), kLevelsKeyAliases))
+        {
+          return &kv.second;
+        }
+      }
+      return nullptr;
+    }
+
+    // Applies an env var that holds a JSON document: a top-level object
+    // with a "levels" member applies that member; any other JSON value is
+    // treated as the levels document itself.
+    bool apply_levels_json_env(Config& cfg, std::string_view envName, const std::string& trimmedRaw, std::string& err)
+    {
+      const std::string prefix = "Invalid " + std::string(envName) + ": ";
+      JsonParser parser(trimmedRaw);
+      JsonValue root;
+      JsonParseError parseErr;
+      if (!parser.parse(root, parseErr))
+      {
+        err = prefix + parseErr.message + " at " + json_location(trimmedRaw, parseErr.pos);
+        return false;
+      }
+      const JsonValue* levels = levels_member(root);
+      if (!apply_levels_json(cfg, levels ? *levels : root, err))
+      {
+        err = prefix + err;
+        return false;
+      }
+      return true;
+    }
+
     // Applies one env var that holds either a comma list or a JSON doc.
     bool apply_single_level_list_env(Config& cfg, std::string_view envName, const char* raw, std::string& err)
     {
@@ -528,41 +584,7 @@ namespace logamuffin
       // comma-separated NAME=VALUE:COLOR list.
       if (!trimmedRaw.empty() && (trimmedRaw.front() == '{' || trimmedRaw.front() == '['))
       {
-        JsonParser parser(trimmedRaw);
-        JsonValue root;
-        JsonParseError parseErr;
-        if (!parser.parse(root, parseErr))
-        {
-          err = std::string("Invalid ") + std::string(envName) + ": " + parseErr.message + " at " + json_location(trimmedRaw, parseErr.pos);
-          return false;
-        }
-        const JsonValue* levels = nullptr;
-        if (root.isObject())
-        {
-          for (const auto& kv: root.objectValue)
-          {
-            if (matches_any(normalize_key(kv.first), kLevelsKeyAliases))
-            {
-              levels = &kv.second;
-              break;
-            }
-          }
-          if (levels)
-          {
-            if (!apply_levels_json(cfg, *levels, err))
-            {
-              err = std::string("Invalid ") + std::string(envName) + ": " + err;
-              return false;
-            }
-            return true;
-          }
-        }
-        if (!apply_levels_json(cfg, root, err))
-        {
-          err = std::string("Invalid ") + std::string(envName) + ": " + err;
-          return false;
-        }
-        return true;
+        return apply_levels_json_env(cfg, envName, trimmedRaw, err);
       }
       for (const auto& entryRaw: split_level_list(raw))
       {
@@ -576,12 +598,12 @@ namespace logamuffin
         std::string entryErr;
         if (!parse_level_entry(entry, name, fields, entryErr))
         {
-          err = std::string("Invalid ") + std::string(envName) + ": " + entryErr;
+          err = "Invalid " + std::string(envName) + ": " + entryErr;
           return false;
         }
         if (!upsert_level(cfg.levels, name, fields.value, fields.color, err))
         {
-          err = std::string("Invalid ") + std::string(envName) + ": " + err;
+          err = "Invalid " + std::string(envName) + ": " + err;
           return false;
         }
       }
@@ -606,10 +628,88 @@ namespace logamuffin
       return true;
     }
 
+    // "NOTICE" -> "NOTICE"; every non-alphanumeric character becomes '_'
+    // (the env-var suffix form).
+    std::string per_category_suffix(const std::string& name)
+    {
+      std::string suffix;
+      for (char c: name)
+      {
+        suffix += ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) ? c : '_';
+      }
+      return suffix;
+    }
+
+    // Returns the first set variable from `vars`, or nullptr when none is
+    // set. Per-category override uses the first spelling that is set.
+    const std::string* first_set_env_var(const std::array<std::string, 2>& vars)
+    {
+      for (const auto& var: vars)
+      {
+        if (std::getenv(var.c_str()))
+        {
+          return &var;
+        }
+      }
+      return nullptr;
+    }
+
+    // Applies LOG_LEVEL_VALUE_<NAME> / LOG_LEVEL_<NAME>_VALUE when set.
+    // Returns false only on a malformed value; unset variables are ignored.
+    bool apply_per_category_value(Config& cfg, const std::string& name, const std::string& suffix, std::string& err)
+    {
+      const std::array<std::string, 2> vars = { "LOG_LEVEL_VALUE_" + suffix, "LOG_LEVEL_" + suffix + "_VALUE" };
+      const std::string* var                = first_set_env_var(vars);
+      if (!var)
+      {
+        return true;
+      }
+      const char* raw = std::getenv(var->c_str());
+      int value       = 0;
+      if (!raw || !parse_int_strict(raw, value))
+      {
+        err = "Invalid " + *var + ": '" + (raw ? raw : "") + "' (expected an integer)";
+        return false;
+      }
+      if (!upsert_level(cfg.levels, name, value, std::nullopt, err))
+      {
+        err = "Invalid " + *var + ": " + err;
+        return false;
+      }
+      return true;
+    }
+
+    // Applies LOG_LEVEL_COLOR_<NAME> / LOG_LEVEL_<NAME>_COLOR when set.
+    // Returns false only on a malformed value; unset variables are ignored.
+    bool apply_per_category_color(Config& cfg, const std::string& name, const std::string& suffix, std::string& err)
+    {
+      const std::array<std::string, 2> vars = { "LOG_LEVEL_COLOR_" + suffix, "LOG_LEVEL_" + suffix + "_COLOR" };
+      const std::string* var                = first_set_env_var(vars);
+      if (!var)
+      {
+        return true;
+      }
+      const char* raw = std::getenv(var->c_str());
+      std::string escape;
+      std::string colorErr;
+      if (!raw || !resolve_color(raw, escape, colorErr))
+      {
+        err = "Invalid " + *var + ": '" + (raw ? raw : "") + "' (" + colorErr + ")";
+        return false;
+      }
+      if (!upsert_level(cfg.levels, name, std::nullopt, escape, err))
+      {
+        err = "Invalid " + *var + ": " + err;
+        return false;
+      }
+      return true;
+    }
+
     // Per-category overrides: LOG_LEVEL_VALUE_<NAME> / LOG_LEVEL_COLOR_<NAME>
     // (and the LOG_LEVEL_<NAME>_VALUE / _COLOR spellings).
     bool apply_env_per_category_overrides(Config& cfg, std::string& err)
     {
+      // Collect names first: upserting mutates cfg.levels while we iterate.
       std::vector<std::string> names;
       for (const auto& level: cfg.levels)
       {
@@ -617,59 +717,14 @@ namespace logamuffin
       }
       for (const auto& name: names)
       {
-        std::string suffix;
-        for (char c: name)
+        const std::string suffix = per_category_suffix(name);
+        if (!apply_per_category_value(cfg, name, suffix, err))
         {
-          suffix += ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) ? c : '_';
+          return false;
         }
-        const std::string valueVars[] = {
-          "LOG_LEVEL_VALUE_" + suffix,
-          "LOG_LEVEL_" + suffix + "_VALUE",
-        };
-        const std::string colorVars[] = {
-          "LOG_LEVEL_COLOR_" + suffix,
-          "LOG_LEVEL_" + suffix + "_COLOR",
-        };
-        for (const auto& var: valueVars)
+        if (!apply_per_category_color(cfg, name, suffix, err))
         {
-          const char* raw = std::getenv(var.c_str());
-          if (!raw)
-          {
-            continue;
-          }
-          int value = 0;
-          if (!parse_int_strict(raw, value))
-          {
-            err = "Invalid " + var + ": '" + std::string(raw) + "' (expected an integer)";
-            return false;
-          }
-          if (!upsert_level(cfg.levels, name, value, std::nullopt, err))
-          {
-            err = "Invalid " + var + ": " + err;
-            return false;
-          }
-          break;
-        }
-        for (const auto& var: colorVars)
-        {
-          const char* raw = std::getenv(var.c_str());
-          if (!raw)
-          {
-            continue;
-          }
-          std::string escape;
-          std::string colorErr;
-          if (!resolve_color(raw, escape, colorErr))
-          {
-            err = "Invalid " + var + ": '" + std::string(raw) + "' (" + colorErr + ")";
-            return false;
-          }
-          if (!upsert_level(cfg.levels, name, std::nullopt, escape, err))
-          {
-            err = "Invalid " + var + ": " + err;
-            return false;
-          }
-          break;
+          return false;
         }
       }
       return true;
@@ -693,22 +748,22 @@ namespace logamuffin
     // Threshold + scalar resolution (env wins over file over defaults)
     // ---------------------------------------------------------------------------
 
+    // Sets *target to the named env var when set and non-empty.
+    void apply_env_string(std::optional<std::string>& target, const char* envName)
+    {
+      if (const char* value = std::getenv(envName))
+      {
+        if (*value)
+        {
+          target = std::string(value);
+        }
+      }
+    }
+
     bool resolve_threshold_and_scalars(Config& cfg, const ThresholdSpec& pending, std::string& err)
     {
-      if (const char* envFile = std::getenv("LOG_FILE"))
-      {
-        if (*envFile)
-        {
-          cfg.logFile = std::string(envFile);
-        }
-      }
-      if (const char* envSource = std::getenv("LOG_SOURCE"))
-      {
-        if (*envSource)
-        {
-          cfg.source = std::string(envSource);
-        }
-      }
+      apply_env_string(cfg.logFile, "LOG_FILE");
+      apply_env_string(cfg.source, "LOG_SOURCE");
       if (const char* envColor = std::getenv("LOG_COLOR"))
       {
         const std::string v = uppercase(trim(envColor));

@@ -19,7 +19,7 @@ flowchart TD
     click Const href "ansi_colors.hpp.md"
 ```
 
-`color.cpp.md` documents `color.cpp` and `color.hpp`. The pair translates user-supplied color specifications into ANSI escape strings. Only `resolve_color()` is public; the name tables and escape helpers are file-local in `color.cpp`.
+`color.cpp.md` documents `color.cpp` and `color.hpp`. The pair translates user-supplied color specifications into ANSI escape strings. Only `resolve_color()` is public; the named tables and the per-form escape resolvers are file-local in `color.cpp`. `resolve_color()` walks a fixed precedence list of form resolvers (raw ESC sequence → literal `\033`/`\e`/`\x1b` text → `[0;31m` bracket form → `#rrggbb`/`#rgb` hex → bare SGR code); the first form to claim the spec decides the outcome, and anything unclaimed falls through to the named-color table.
 
 ## Interface
 
