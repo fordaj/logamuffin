@@ -20,7 +20,7 @@ Vernacular used in the headers (`log INFO`, `$REPO_ROOT_DIR`, `VERSIONER_BIN`): 
 
 - `scripts/entry.sh` — sources `scripts/env.sh` and defines `log()` (logamuffin, with a printf fallback). Sourced by everything else. See [entry.sh.md](entry.sh.md).
 - `scripts/env.sh` — locates and sources the cascade below, then anchors the repository-relative `*_BIN` tool paths to absolute paths. See [env.sh.md](env.sh.md).
-- `scripts/.common.env`, `scripts/.<os>-<arch>.env` — the cascade proper. Hidden files, so barnacle does not render them as pages; their contract (pinned versions, platform quirks) is documented inside [env.sh.md](env.sh.md) instead. `.common.env` pins `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v0.1.3.0.35`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v0.0.1.0.17` and holds the upstream `fordaj/*` slugs; each platform file sets `PROJECT_PLATFORM` and the `*_BIN` paths for its `<os>-<arch>`.
+- `scripts/.common.env`, `scripts/.<os>-<arch>.env` — the cascade proper. Hidden files, so barnacle does not render them as pages; their contract (pinned versions, platform quirks) is documented inside [env.sh.md](env.sh.md) instead. `.common.env` pins `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v254.1.3.0.47`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v254.0.1.1.22` and holds the upstream `fordaj/*` slugs; each platform file sets `PROJECT_PLATFORM` and the `*_BIN` paths for its `<os>-<arch>`.
 
 ## Task scripts
 

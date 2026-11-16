@@ -22,14 +22,14 @@ flowchart LR
 ```text
 tools/logamuffin/
   update.sh                     # refresh from fordaj/logamuffin releases (wrapper)
-  v0.1.3.0.35/                    # NOT committed to git at present
-    macos-arm64/logamuffin        # (fetch with update.sh)
+  v254.1.3.0.47/
+    macos-arm64/logamuffin
     ...
 ```
 
-`scripts/.common.env` pins `LOGAMUFFIN_VERSION_DIR=tools/logamuffin/v0.1.3.0.35` and the platform env files point `LOGAMUFFIN_BIN` at it. Only `update.sh` is tracked in git — the v0.1.3.0.35 binaries are absent from this checkout, so `scripts/entry.sh`'s `log()` currently falls back to printf until the bundle is fetched. (The `.gitignore` does not exclude them; they simply have not been committed/fetched here.)
+`scripts/.common.env` pins `LOGAMUFFIN_VERSION_DIR=tools/logamuffin/v254.1.3.0.47` and the platform env files point `LOGAMUFFIN_BIN` at it. The binaries are committed to git (they were fetched with `update.sh`), so `scripts/entry.sh`'s `log()` forwards to the bundled binary on every platform.
 
-Pinned as `LOGAMUFFIN v0.1.3.0.35`; see [../../scripts/env.sh.md](../../scripts/env.sh.md).
+Pinned as `LOGAMUFFIN v254.1.3.0.47`; see [../../scripts/env.sh.md](../../scripts/env.sh.md).
 
 ## `update.sh` in detail
 
