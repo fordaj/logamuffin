@@ -30,7 +30,7 @@ scripts/release.sh --dry-run # compute + build only, touch nothing remote
 
 ## What it does
 
-1. Computes `VERSION`/`TAG` with the bundled `tools/versioner/v*/<platform>/versioner` (override with `VERSIONER_BIN`); validates `TAG` against `vX.Y.Z.W.V`.
+1. Computes `VERSION`/`TAG` with the bundled `tools/versioner/v*/<platform>/versioner` (host detection and bundled-binary resolution shared via `tools/host_platform.sh`; override with `VERSIONER_BIN`); validates `TAG` against `vX.Y.Z.W.V`.
 2. Refuses to run if `TAG` already exists locally or on `origin` (make a new `feat:`/`fix:` commit to bump the version).
 3. Regenerates `.version/version.hpp` via `tools/generate_version.sh.md` and checks it contains `LOGAMUFFIN_VERSION_TAG "$TAG"`.
 4. Runs `BUILD_MODE=release scripts/build.sh`; stages `dist/<platform>/` with binary + `README.md` + `LICENSE`; sanity-checks the native binary's `--version`.
@@ -45,4 +45,5 @@ scripts/release.sh --dry-run # compute + build only, touch nothing remote
 - [version.sh.md](version.sh.md) — read-only version printing via the same binary
 - `tools/versioner/update.sh.md` — refresh the bundled versioner
 - `tools/generate_version.sh.md` — version header regeneration
+- `tools/host_platform.sh.md` — shared host/versioner helpers sourced by this script
 - [../README.md](../README.md) — "Building from source" / release notes

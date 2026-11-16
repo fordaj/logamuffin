@@ -82,6 +82,7 @@ namespace logamuffin
     bool atEnd() const;
     char peek() const;
     char consume();
+    void consumeDigits();
     bool skipIgnored(JsonParseError& err);
     bool parseValue(JsonValue& out, JsonParseError& err, int depth);
     bool parseLiteral(const std::string& lit, bool boolVal, JsonValue& out, JsonParseError& err);

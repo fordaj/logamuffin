@@ -216,20 +216,13 @@ if [[ "$SKIP_INTEGRATION" != "true" ]]; then
     echo
 
     if [[ "$INTEG_STATUS" != "BUILD FAILED" ]]; then
-        if [[ "$VERBOSE" == "true" ]]; then
-            if python3 tests/integration/test_cli.py --executable "$BIN_PATH" -v; then
-                INTEG_STATUS="passed"
-            else
-                INTEG_STATUS="FAILED"
-                EXIT_CODE=1
-            fi
+        test_cmd=(python3 tests/integration/test_cli.py --executable "$BIN_PATH")
+        [[ "$VERBOSE" == "true" ]] && test_cmd+=(-v)
+        if "${test_cmd[@]}"; then
+            INTEG_STATUS="passed"
         else
-            if python3 tests/integration/test_cli.py --executable "$BIN_PATH"; then
-                INTEG_STATUS="passed"
-            else
-                INTEG_STATUS="FAILED"
-                EXIT_CODE=1
-            fi
+            INTEG_STATUS="FAILED"
+            EXIT_CODE=1
         fi
     fi
     echo

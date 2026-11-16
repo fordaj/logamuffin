@@ -34,14 +34,9 @@ namespace logamuffin
   namespace
   {
 
-    bool is_digit_char(char c)
-    {
-      return c >= '0' && c <= '9';
-    }
-
     bool is_valid_level_char(char c)
     {
-      return (c >= 'A' && c <= 'Z') || is_digit_char(c) || c == '_' || c == '-';
+      return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
     }
 
   } // namespace

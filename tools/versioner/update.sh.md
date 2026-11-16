@@ -2,15 +2,17 @@
 
 ```mermaid
 flowchart LR
-    Up[update.sh] --> Tag{resolve tag<br/>latest release or --tag}
+    Up[update.sh<br/>thin wrapper] --> Core["../update-bundle.sh<br/>shared implementation"]
+    Core --> Tag{resolve tag<br/>latest release or --tag}
     Tag --> DL["gh release download"]
     DL --> Sum{checksums.txt<br/>shipped?}
     Sum -->|yes| Verify["verify SHA256"]
     Sum -->|no| Warn["warn, keep going"]
-    Verify --> Stage["stage into v…/platform/<br/>binary + LICENSE"]
+    Verify --> Stage["stage into v…/platform/<br/>binary only"]
     Warn --> Stage
     Stage --> Swap["swap in,<br/>remove superseded"]
     Swap --> Smoke["host binary reports<br/>its version"]
+    click Core href "../update-bundle.sh.md"
 ```
 
 [Versioner](https://github.com/fordaj/Versioner) derives a five-part version (`branch.major.minor.revision.patch`) from git history. This repository uses it to stamp every build: `scripts/build.sh`, `run_tests.sh`, `tools/generate_version.sh`, and `scripts/release.sh` all call the bundled binary so `--version` always reflects `HEAD`. `.versioner.json` configures the scheme (main exempt to branch-version `0`, other branches to `254`). See "Versioning" in [../../README.md](../../README.md) for the full story (`.version/version.hpp`, `LOGAMUFFIN_VERSION`, `LOGAMUFFIN_VERSION_TAG`).
@@ -19,7 +21,7 @@ flowchart LR
 
 ```text
 tools/versioner/
-  update.sh                     # refresh from fordaj/Versioner releases
+  update.sh                     # refresh from fordaj/Versioner releases (wrapper)
   v0.0.3.0.5/
     macos-arm64/versioner
     macos-x86_64/versioner
@@ -34,7 +36,9 @@ Pinned as `VERSIONER_VERSION_DIR=tools/versioner/v0.0.3.0.5` in `scripts/.common
 
 ## `update.sh` in detail
 
-Assets are `Versioner-<platform>.tar.gz` (macOS/Linux) and `Versioner-<platform>.zip` (Windows). The script:
+`update.sh` is a thin wrapper that exports `TOOL_*` configuration and execs [../update-bundle.sh.md](../update-bundle.sh.md), the shared implementation for all bundles. Versioner specifics: no `TOOL_ASSET_SUFFIX` (every archive is consumed), no extra files, and a missing checksums file only warns.
+
+Assets are `Versioner-<platform>.tar.gz` (macOS/Linux) and `Versioner-<platform>.zip` (Windows). The shared script:
 
 1. Resolves the tag (latest release, or `--tag vX.Y.Z...`), validating the tag shape.
 2. Downloads via `gh`, then verifies the downloaded archives against upstream `checksums.txt`/`SHA256SUMS.txt` (`shasum -a 256 -c` or `sha256sum -c`), looking up each asset by name. A missing checksums file only warns; a mismatch is fatal.
@@ -46,6 +50,7 @@ Flags: `--dry-run`, `--tag TAG`, `--repo REPO`. Environment overrides: `VERSIONE
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
+- [../update-bundle.sh.md](../update-bundle.sh.md) — the shared implementation
 - [../generate_version.sh.md](../generate_version.sh.md) — what consumes this binary to write `.version/version.hpp`
 - [../../scripts/version.sh.md](../../scripts/version.sh.md) — read-only version printing
 - [../../scripts/release.sh.md](../../scripts/release.sh.md) — releases tagged with this version

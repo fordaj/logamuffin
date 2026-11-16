@@ -2,7 +2,8 @@
 
 ```mermaid
 flowchart LR
-    Up[update.sh] --> Tag{resolve tag<br/>latest release or --tag}
+    Up[update.sh<br/>thin wrapper] --> Core["../update-bundle.sh<br/>shared implementation"]
+    Core --> Tag{resolve tag<br/>latest release or --tag}
     Tag --> DL["gh release download"]
     DL --> Sum{checksums.txt<br/>shipped?}
     Sum -->|yes| Verify["verify SHA256"]
@@ -11,6 +12,7 @@ flowchart LR
     Warn --> Stage
     Stage --> Swap["swap in,<br/>remove superseded"]
     Swap --> Smoke["host binary reports<br/>its version"]
+    click Core href "../update-bundle.sh.md"
 ```
 
 [Barnacle](https://github.com/fordaj/barnacle) is a documentation-site generator: it renders the `.md` and `.mmd` files scattered through a repository into a static, navigable HTML site. This repository uses it to render *this* documentation; the site you may be reading was built by it.
@@ -19,7 +21,7 @@ flowchart LR
 
 ```text
 tools/barnacle/
-  update.sh                     # refresh from fordaj/barnacle releases
+  update.sh                     # refresh from fordaj/barnacle releases (wrapper)
   v0.0.1.0.17/
     macos-arm64/barnacle
     macos-x86_64/barnacle
@@ -33,14 +35,16 @@ Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v0.0.1.0.17` in `scripts/.common.
 
 ## `update.sh` in detail
 
-Assets are `barnacle-<platform>.tar.gz` (macOS/Linux) and `barnacle-<platform>.zip` (Windows), each carrying the binary at the archive root or inside a single top-level directory. The script:
+`update.sh` is a thin wrapper that exports `TOOL_*` configuration and execs [../update-bundle.sh.md](../update-bundle.sh.md), the shared implementation for all bundles. Barnacle specifics: no `TOOL_ASSET_SUFFIX` (every archive is consumed), `TOOL_EXTRA_FILES=LICENSE` (copied alongside the binary when present), and a missing checksums file only warns.
+
+Assets are `barnacle-<platform>.tar.gz` (macOS/Linux) and `barnacle-<platform>.zip` (Windows), each carrying the binary at the archive root or inside a single top-level directory. The shared script:
 
 1. Resolves the tag (latest release, or `--tag vX.Y.Z...`), validating the tag shape.
 2. Downloads via `gh`, then verifies the downloaded archives against the upstream `checksums.txt`/`SHA256SUMS.txt` (`shasum -a 256 -c` or `sha256sum -c`), looking up each downloaded asset by name. A missing checksums file only warns; a mismatch is fatal.
 3. Extracts each archive (`tar` for `.tar.gz`; `unzip` for `.zip`; `7z`/`7zz` as a fallback for legacy `.7z` assets), copies the binary into `v<tag>/<platform>/`, and makes it executable. LICENSE, if present in an archive, is copied alongside the binary into the per-platform directory.
 4. Swaps in the new version directory and deletes superseded ones, then smoke-tests the host binary (`barnacle --version`).
 
-Flags: `--dry-run` lists the assets without touching anything; `--tag TAG` pins a release; `--repo REPO` overrides the slug. Environment overrides: `BARNACLE_REPO`, `BARNACLE_TAG`. Only the binary is kept per platform.
+Flags: `--dry-run` lists the assets without touching anything; `--tag TAG` pins a release; `--repo REPO` overrides the slug. Environment overrides: `BARNACLE_REPO`, `BARNACLE_TAG`. Only the binary is kept per platform (plus the upstream MIT LICENSE).
 
 ## How the repository uses it
 
@@ -49,5 +53,6 @@ Flags: `--dry-run` lists the assets without touching anything; `--tag TAG` pins 
 ## Related pages
 
 - [../README.md](../README.md) — the bundle index
+- [../update-bundle.sh.md](../update-bundle.sh.md) — the shared implementation
 - [../../scripts/docs.sh.md](../../scripts/docs.sh.md) — the docs generator that runs this binary
 - [../../scripts/README.md](../../scripts/README.md) — the scripts that consume the bundle

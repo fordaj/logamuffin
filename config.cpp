@@ -812,18 +812,14 @@ namespace logamuffin
       {
         return *cliConfigPath;
       }
-      if (const char* envConfig = std::getenv("LOG_CONFIG"))
+      for (const char* envName: { "LOG_CONFIG", "LOGAMUFFIN_CONFIG" })
       {
-        if (*envConfig)
+        if (const char* envConfig = std::getenv(envName))
         {
-          return std::string(envConfig);
-        }
-      }
-      if (const char* envConfig = std::getenv("LOGAMUFFIN_CONFIG"))
-      {
-        if (*envConfig)
-        {
-          return std::string(envConfig);
+          if (*envConfig)
+          {
+            return std::string(envConfig);
+          }
         }
       }
       std::error_code ec;

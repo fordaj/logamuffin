@@ -3,7 +3,7 @@
 ```mermaid
 flowchart TD
     Tools[tools/] --> Bundles["pinned bundles<br/>update.sh + versioned dirs"]
-    Tools --> Helpers["committed helpers<br/>generate_version.sh · sources.sh"]
+    Tools --> Helpers["committed helpers<br/>update-bundle.sh · host_platform.sh<br/>generate_version.sh · sources.sh"]
     Tools --> Doctest[vendored doctest]
     Bundles --> Ver[versioner]
     Bundles --> Logm[logamuffin]
@@ -15,7 +15,7 @@ flowchart TD
     click RS href "runner-spawner/update.sh.md"
     click Bar href "barnacle/update.sh.md"
     click FL href "formattington-lite/update.sh.md"
-    click Helpers href "sources.sh.md"
+    click Helpers href "update-bundle.sh.md"
     click Doctest href "doctest/README.md"
 ```
 
@@ -33,7 +33,7 @@ tools/<name>/
 
 - Binaries are pinned by version directory; the pinned version is named by `*_VERSION_DIR` in [`scripts/.common.env`](../scripts/env.sh.md).
 - `<platform>` is the hyphenated `<os>-<arch>` name (`linux-x86_64`, `macos-arm64`, `windows-x86_64`, …).
-- Each `update.sh` downloads the latest (or `--tag`ged) upstream release via `gh`, verifies checksums when the release ships them, stages into a temporary directory, and swaps in atomically — a failed refresh leaves the previous bundle intact. Each has `--dry-run`, `--help`, and resolves its own directory.
+- Each `update.sh` is a thin wrapper around [update-bundle.sh](update-bundle.sh.md), the shared implementation: resolves the tag (latest release, or `--tag`), downloads via `gh`, verifies checksums when the release ships them, stages into a temporary directory, and swaps in atomically — a failed refresh leaves the previous bundle intact. Each has `--dry-run`, `--help`, and resolves its own directory.
 
 ## The bundles
 
@@ -51,6 +51,8 @@ Pins currently named by `scripts/.common.env`: `VERSIONER v0.0.3.0.5`, `LOGAMUFF
 
 ## Other entries in `tools/`
 
+- [update-bundle.sh.md](update-bundle.sh.md) — the shared implementation behind every `update.sh` above (tag resolution, download, checksum verification, staging, atomic swap); each bundle's wrapper only exports `TOOL_*` configuration.
+- [host_platform.sh.md](host_platform.sh.md) — sourced helpers for host platform detection and bundled-Versioner resolution (`host_platform`, `locate_versioner`, `parse_shell_export`); used by `generate_version.sh`, `scripts/release.sh`, and `scripts/demo.sh`.
 - [generate_version.sh.md](generate_version.sh.md) — `generate_version.sh` regenerates `.version/version.hpp` from git history via the bundled Versioner binary.
 - [sources.sh.md](sources.sh.md) — `sources.sh` is the single source list for build translation units (`SOURCES`/`UNIT_SOURCES`), sourced by `build.sh` and `run_tests.sh`.
 - [doctest/](doctest/README.md) — vendored doctest 2.5.3 single header for the unit tests (no `update.sh`; see its page).

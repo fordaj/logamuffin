@@ -27,6 +27,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # Build outputs live at the repository root; SCRIPT_DIR is scripts/.
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
+# Shared host detection (tools/host_platform.sh); used to locate platform builds.
+# shellcheck source=tools/host_platform.sh
+. "$REPO_ROOT/tools/host_platform.sh"
+
 resolve_logger() {
     if command -v logamuffin >/dev/null 2>&1; then
         command -v logamuffin
@@ -41,29 +45,9 @@ resolve_logger() {
 
     # Platform build from scripts/build.sh (build/release|debug/<platform>/).
     local platform
-    case "$(uname -s):$(uname -m)" in
-    Darwin:x86_64)
-        platform="macos-x86_64"
-        ;;
-    Darwin:arm64)
-        platform="macos-arm64"
-        ;;
-    MINGW*:x86_64 | MSYS*:x86_64 | CYGWIN*:x86_64)
-        platform="windows-x86_64"
-        ;;
-    MINGW*:ARM64 | MSYS*:ARM64 | CYGWIN*:ARM64)
-        platform="windows-arm64"
-        ;;
-    Linux:x86_64)
-        platform="linux-x86_64"
-        ;;
-    Linux:aarch64 | Linux:arm64)
-        platform="linux-arm64"
-        ;;
-    *)
+    if ! platform="$(host_platform)"; then
         return 1
-        ;;
-    esac
+    fi
 
     # Windows build output uses the .exe suffix.
     local suffix=""

@@ -10,7 +10,7 @@ flowchart LR
     click Consumers href "../scripts/build.sh.md"
 ```
 
-`tools/generate_version.sh` regenerates `.version/version.hpp` from git history via the bundled [Versioner](versioner/update.sh.md) binary. Build scripts call it before compiling so `logamuffin --version` always reflects the current `HEAD`. The `.version/` directory is git-ignored and must not be committed.
+`tools/generate_version.sh` regenerates `.version/version.hpp` from git history via the bundled [Versioner](versioner/update.sh.md) binary. Build scripts call it before compiling so `logamuffin --version` always reflects the current `HEAD`. The `.version/` directory is git-ignored and must not be committed. Host platform detection and bundled-binary resolution are shared with the release tooling via [host_platform.sh.md](host_platform.sh.md) (`host_platform` / `locate_versioner` / `parse_shell_export`).
 
 ## Usage
 
@@ -32,5 +32,6 @@ Called by [../scripts/build.sh.md](../scripts/build.sh.md), [../scripts/release.
 ## Related pages
 
 - [versioner/update.sh.md](versioner/update.sh.md) — the bundled binary and how to refresh it
+- [host_platform.sh.md](host_platform.sh.md) — the shared host/versioner helpers this script sources
 - [../scripts/build.sh.md](../scripts/build.sh.md) — caller
 - [../README.md](../README.md) — "Versioning" section
