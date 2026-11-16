@@ -1,5 +1,13 @@
 # Vendored doctest (`tools/doctest/`)
 
+```mermaid
+flowchart LR
+    DH["doctest.h<br/>v2.5.3 · single header · vendored"] --> Bin[unit binary<br/>-Itools/doctest/v2.5.3]
+    Bin --> RT["run_tests.sh"]
+    RT --> CI["ci: ./scripts/run_tests.sh<br/>on macOS"]
+    click Bin href "../../scripts/run_tests.sh.md"
+```
+
 `tools/doctest/` holds the vendored third-party [doctest](https://github.com/doctest/doctest) testing framework — the C++ unit tests in `tests/unit/test_logamuffin.cpp` are built against it. It is the only third-party code vendored in this repository, and it ships as a single header, so there is no build step and no package manager involvement.
 
 ## Layout
@@ -19,10 +27,10 @@ tools/doctest/
 
 ## Where it is used
 
-`run_tests.sh` checks for `tools/doctest/v2.5.3/doctest.h` (fails fast if absent) and compiles the unit-test binary with `-Itools/doctest/v2.5.3` against `UNIT_SOURCES` (see [../sources.md](../sources.md)). [docs/TESTING.md](../../docs/TESTING.md) documents the unit-test architecture. `format.sh`/`ci/format_check.sh` skip `tools/doctest/` (third-party, never reformatted).
+`run_tests.sh` checks for `tools/doctest/v2.5.3/doctest.h` (fails fast if absent) and compiles the unit-test binary with `-Itools/doctest/v2.5.3` against `UNIT_SOURCES` (see [../sources.sh.md](../sources.sh.md)). [docs/TESTING.md](../../docs/TESTING.md) documents the unit-test architecture. `format.sh`/`ci/format_check.sh` skip `tools/doctest/` (third-party, never reformatted).
 
 ## Related pages
 
-- [../../run_tests.md](../../scripts/run_tests.md) — builds and runs the unit suite
-- [../sources.md](../sources.md) — `UNIT_SOURCES` linked into the unit binary
+- [../../run_tests.sh.md](../../scripts/run_tests.sh.md) — builds and runs the unit suite
+- [../sources.sh.md](../sources.sh.md) — `UNIT_SOURCES` linked into the unit binary
 - [../README.md](../README.md) — the tools index

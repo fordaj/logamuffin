@@ -24,6 +24,9 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
+# Build outputs live at the repository root; SCRIPT_DIR is scripts/.
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
 resolve_logger() {
     if command -v logamuffin >/dev/null 2>&1; then
         command -v logamuffin
@@ -31,8 +34,8 @@ resolve_logger() {
     fi
 
     # Fresh native debug build from ./scripts/run_tests.sh (single-command path).
-    if [[ -x "$SCRIPT_DIR/build/debug/logamuffin" ]]; then
-        printf '%s\n' "$SCRIPT_DIR/build/debug/logamuffin"
+    if [[ -x "$REPO_ROOT/build/debug/logamuffin" ]]; then
+        printf '%s\n' "$REPO_ROOT/build/debug/logamuffin"
         return 0
     fi
 
@@ -72,8 +75,8 @@ resolve_logger() {
 
     local candidate
     for candidate in \
-        "$SCRIPT_DIR/build/release/$platform/logamuffin$suffix" \
-        "$SCRIPT_DIR/build/debug/$platform/logamuffin$suffix"; do
+        "$REPO_ROOT/build/release/$platform/logamuffin$suffix" \
+        "$REPO_ROOT/build/debug/$platform/logamuffin$suffix"; do
         if [[ -x "$candidate" ]]; then
             printf '%s\n' "$candidate"
             return 0

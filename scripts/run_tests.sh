@@ -16,11 +16,14 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# Build and test outputs live at the repository root; run there no matter
+# where this script is invoked from.
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
 
 # Single source for TU list + native toolchain (see tools/sources.sh).
 # shellcheck source=tools/sources.sh
-source "$SCRIPT_DIR/tools/sources.sh"
+source "$REPO_ROOT/tools/sources.sh"
 
 UNIT_BIN="build/debug/tests/unit/test_logamuffin"
 NATIVE_BIN="build/debug/logamuffin"

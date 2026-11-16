@@ -1,5 +1,22 @@
 # logamuffin
 
+```mermaid
+flowchart LR
+    Script[Your shell script] -->|<a href='scripts/log.sh.md'>log INFO</a>| Wrap["scripts/log.sh<br/>call-site LOG_SOURCE"]
+    Script -->|logamuffin INFO 'msg'| Bin[logamuffin binary]
+    Wrap --> Bin
+    Bin --> Cfg["load_config()<br/>defaults → file → env"]
+    Cfg --> Reg[Level registry]
+    Bin --> Reg
+    Reg -->|below 40| Out[stdout]
+    Reg -->|40 or above| Err[stderr]
+    Bin --> File["append_locked()<br/>→ .logs/log.log"]
+    click Bin href "logamuffin.cpp.md"
+    click Cfg href "config.cpp.md"
+    click Reg href "log_levels.cpp.md"
+    click File href "platform.cpp.md"
+```
+
 Logamuffin is a lightweight, cross-platform logging utility built in C++20. It brings readable, colorized logging to shell scripts, build pipelines, and command-line tools — without requiring a logging framework or a scripting-language runtime.
 
 ```bash
@@ -173,7 +190,7 @@ log INFO "Application started"
 log DEBUG "Loading configuration"
 ```
 
-The copy-paste function (also shipped as `scripts/log.sh` — source that file, documented in [scripts/log.md](scripts/log.md), to get the identical behavior):
+The copy-paste function (also shipped as `scripts/log.sh` — source that file, documented in [scripts/log.sh.md](scripts/log.sh.md), to get the identical behavior):
 
 ```bash
 log() {
@@ -565,7 +582,7 @@ It's intended for shell scripts and standalone automation, not as a replacement 
 
 ## Documentation
 
-Every source file has a sibling Markdown page documenting it, rendered into a static site with [barnacle](https://github.com/fordaj/barnacle). See [AGENTS.md](AGENTS.md) for the documentation map and conventions, and run `scripts/docs.sh` to generate the site (output in `./site/`, git-ignored).
+Every documented source file has a sibling Markdown page named for the file it documents — `color.cpp` by `color.cpp.md`, `scripts/build.sh` by `scripts/build.sh.md` — rendered into a static site with [barnacle](https://github.com/fordaj/barnacle). Every page opens with a Mermaid diagram, and diagram nodes link to the pages they describe, so the site is navigable by diagram alone. See [AGENTS.md](AGENTS.md) for the documentation map and conventions, and run `scripts/docs.sh` to generate the site (output in `./site/`, git-ignored).
 
 ## License
 

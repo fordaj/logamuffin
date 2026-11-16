@@ -58,7 +58,7 @@ _logamuffin_bin() {
     fi
     # Last resort: the repo-local debug build (run_tests.sh output).
     local helper_dir
-    helper_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+    helper_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
     if [[ -x "$helper_dir/build/debug/logamuffin" ]]; then
         printf '%s\n' "$helper_dir/build/debug/logamuffin"
         return 0
