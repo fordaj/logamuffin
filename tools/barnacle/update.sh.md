@@ -22,7 +22,7 @@ flowchart LR
 ```text
 tools/barnacle/
   update.sh                     # refresh from fordaj/barnacle releases (wrapper)
-  v254.0.1.1.22/
+  v0.0.2.1.25/
     macos-arm64/barnacle
     macos-x86_64/barnacle
     linux-arm64/barnacle
@@ -31,7 +31,7 @@ tools/barnacle/
     windows-x86_64/barnacle.exe
 ```
 
-Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v254.0.1.1.22` in `scripts/.common.env`; selected via `BARNACLE_BIN` in the platform env files (see [../../scripts/env.sh.md](../../scripts/env.sh.md)).
+Pinned as `BARNACLE_VERSION_DIR=tools/barnacle/v0.0.2.1.25` in `scripts/.common.env`; selected via `BARNACLE_BIN` in the platform env files (see [../../scripts/env.sh.md](../../scripts/env.sh.md)).
 
 ## `update.sh` in detail
 
