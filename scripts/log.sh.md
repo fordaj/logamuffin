@@ -2,16 +2,25 @@
 
 ```mermaid
 flowchart TD
-    Call["log LEVEL MESSAGE"] --> Resolve{binary resolution}
-    Resolve -->|LOGAMUFFIN_BIN set| Bin[that binary]
-    Resolve -->|command -v logamuffin| OnPath[PATH]
-    Resolve -->|repo build| Build["build/debug/logamuffin<br/>or build/mode/platform/"]
-    Resolve -->|else| Bare[bare logamuffin]
-    Call --> Src["caller file : func : line<br/>passed as LOG_SOURCE"]
+    Call("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>log LEVEL MESSAGE") --> Resolve{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>binary resolution"}}
+    Resolve -->|LOGAMUFFIN_BIN set| Bin("<img src='barnacle:binary.svg' width='20' alt=''/><br/>that binary")
+    Resolve -->|command -v logamuffin| OnPath("<img src='barnacle:check.svg' width='20' alt=''/><br/>PATH")
+    Resolve -->|repo build| Build("<img src='barnacle:binary.svg' width='20' alt=''/><br/><u>build/debug/logamuffin<br/>or build/mode/platform/</u>")
+    Resolve -->|else| Bare("<img src='barnacle:binary.svg' width='20' alt=''/><br/>bare logamuffin")
+    Call --> Src("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>caller file : func : line<br/>passed as LOG_SOURCE")
     Src --> Bin
     OnPath --> Bin
     Build --> Bin
     click Build href "build.sh.md"
+    class Call shFile
+    class Resolve hexNode
+    class Bin,Bare goFile
+    class OnPath checkNode
+    class Build goFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef checkNode fill:#9fe8c9,stroke:#0f766e,color:#052e22
 ```
 
 `scripts/log.sh` defines a `log LEVEL [MESSAGE …]` Bash function that wraps the `logamuffin` executable so call sites stay terse: `log INFO "Starting"` instead of `logamuffin INFO "Starting"`. It resolves the caller's file, function, and line number and passes them to `logamuffin` as `LOG_SOURCE` (e.g. `my-script.sh:myfunc:42`), forwards `LEVEL` (a word such as `INFO` or a number such as `50`) and the message verbatim, and preserves `logamuffin`'s exit code.

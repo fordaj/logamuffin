@@ -2,18 +2,24 @@
 
 ```mermaid
 flowchart TD
-    Main[main] --> Run[run]
-    Run --> Args["parse_cli_args()<br/>--config · --help · --version"]
-    Args -->|usage/config error| Exit2[exit 2]
-    Args --> Load[load_config]
-    Load --> Resolve["resolve_level()<br/>registry → ad-hoc [n]"]
-    Resolve --> Route{value ≥ 40?}
-    Route -->|no| Out[stdout]
-    Route -->|yes| Err[stderr]
-    Run --> File["write_file_log()<br/>append_locked()"]
+    Main("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>main") --> Run("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>run")
+    Run --> Args("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>parse_cli_args()<br/>--config · --help · --version")
+    Args -->|usage/config error| Exit2("<img src='barnacle:circle-exclamation-point.svg' width='20' alt=''/><br/>exit 2")
+    Args --> Load("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>load_config</u>")
+    Load --> Resolve("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>resolve_level()<br/>registry → ad-hoc [n]</u>")
+    Resolve --> Route{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>value ≥ 40?"}}
+    Route -->|no| Out("<img src='barnacle:monitor.svg' width='20' alt=''/><br/>stdout")
+    Route -->|yes| Err("<img src='barnacle:monitor.svg' width='20' alt=''/><br/>stderr")
+    Run --> File("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>write_file_log()<br/>append_locked()</u>")
     click Load href "config.cpp.md"
     click Resolve href "log_levels.cpp.md"
     click File href "platform.cpp.md"
+    class Main,Run,Args,Load,Resolve,File goFile
+    class Exit2 errNode
+    class Route hexNode
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef errNode fill:#f6b8b8,stroke:#b91c1c,color:#450a0a
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
 ```
 
 `logamuffin.cpp.md` documents `logamuffin.cpp`, `logamuffin.hpp`, and `logamuffin_core.cpp` — the executable's entry point and the pure, testable helpers behind it. `logamuffin.hpp` holds declarations, the `Level` model, the `kBuiltinLevels` table, and shared constants; `logamuffin_core.cpp` implements the pure logic; `logamuffin.cpp` owns CLI parsing, I/O, and `main()`.

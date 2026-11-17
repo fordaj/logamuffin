@@ -2,13 +2,17 @@
 
 ```mermaid
 flowchart LR
-    Docs[docs.sh] --> Entry["entry.sh<br/>resolves BARNACLE_BIN"]
-    Entry --> Env["env.sh — the cascade<br/>tools/barnacle/…"]
-    Docs -->|"--site / --config<br/>forwarded verbatim"| Barnacle[barnacle]
+    Docs("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>docs.sh") --> Entry("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>entry.sh<br/>resolves BARNACLE_BIN</u>")
+    Entry --> Env("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>env.sh — the cascade<br/>tools/barnacle/…</u>")
+    Docs -->|"--site / --config<br/>forwarded verbatim"| Barnacle("<img src='barnacle:binary.svg' width='20' alt=''/><br/>barnacle")
     Env --> Barnacle
-    Barnacle --> Site["./site<br/>git-ignored"]
+    Barnacle --> Site("<img src='barnacle:folder.svg' width='20' alt=''/><br/>./site<br/>git-ignored")
     click Entry href "entry.sh.md"
     click Env href "env.sh.md"
+    class Docs,Entry,Env shFile
+    class Site folder
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
 ```
 
 Generates the documentation site you are reading: it runs the pinned barnacle binary against this repository (the bundle is refreshed by `tools/barnacle/update.sh`, documented in `tools/barnacle/update.sh.md`).

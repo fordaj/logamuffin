@@ -2,12 +2,16 @@
 
 ```mermaid
 flowchart LR
-    RT[run_tests.sh] --> Unit["unit binary<br/>doctest"]
-    RT --> Int["integration suite<br/>python3 unittest"]
-    Unit --> U["tests/unit/test_logamuffin.cpp<br/>against logamuffin_core.cpp"]
-    Int --> I["tests/integration/test_cli.py<br/>against a fresh dev binary"]
+    RT("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>run_tests.sh</u>") --> Unit("<img src='barnacle:binary.svg' width='20' alt=''/><br/>unit binary<br/>doctest")
+    RT --> Int("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>integration suite<br/>python3 unittest")
+    Unit --> U("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>tests/unit/test_logamuffin.cpp<br/>against logamuffin_core.cpp</u>")
+    Int --> I("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>tests/integration/test_cli.py<br/>against a fresh dev binary")
     click RT href "../scripts/run_tests.sh.md"
     click U href "../logamuffin.cpp.md"
+    class RT shFile
+    class Unit,Int,U,I goFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
 ```
 
 Logamuffin has two test suites that together cover correctness, CLI

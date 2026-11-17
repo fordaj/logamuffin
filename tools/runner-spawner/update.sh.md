@@ -2,16 +2,28 @@
 
 ```mermaid
 flowchart LR
-    Up[update.sh<br/>thin wrapper] --> Core["../update-bundle.sh<br/>shared implementation"]
-    Core --> Tag{resolve tag<br/>latest release or --tag}
-    Tag --> DL["gh release download"]
-    DL --> Sum{checksums.txt<br/>shipped?}
-    Sum -->|yes| Verify["verify SHA256"]
-    Sum -->|no| Die["fatal —<br/>refusing unverified binaries"]
-    Verify --> Stage["stage into v…/platform/<br/>binary only"]
-    Stage --> Swap["swap in,<br/>remove superseded"]
-    Swap --> Smoke["host binary reports<br/>its version"]
+    Up("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>update.sh<br/>thin wrapper") --> Core("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>../update-bundle.sh<br/>shared implementation</u>")
+    Core --> Tag{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>resolve tag<br/>latest release or --tag"}}
+    Tag --> DL("<img src='barnacle:download.svg' width='20' alt=''/><br/>gh release download")
+    DL --> Sum{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>checksums.txt<br/>shipped?"}}
+    Sum -->|yes| Verify("<img src='barnacle:check.svg' width='20' alt=''/><br/>verify SHA256")
+    Sum -->|no| Die("<img src='barnacle:circle-exclamation-point.svg' width='20' alt=''/><br/>fatal —<br/>refusing unverified binaries")
+    Verify --> Stage("<img src='barnacle:folder.svg' width='20' alt=''/><br/>stage into v…/platform/<br/>binary only")
+    Stage --> Swap("<img src='barnacle:refresh-cw.svg' width='20' alt=''/><br/>swap in,<br/>remove superseded")
+    Swap --> Smoke("<img src='barnacle:check.svg' width='20' alt=''/><br/>host binary reports<br/>its version")
     click Core href "../update-bundle.sh.md"
+    class Up,Core shFile
+    class Tag,Sum hexNode
+    class DL dlNode
+    class Verify,Smoke checkNode
+    class Die errNode
+    class Stage folder
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef dlNode fill:#93e2e2,stroke:#0f766e,color:#042f2e
+    classDef checkNode fill:#9fe8c9,stroke:#0f766e,color:#052e22
+    classDef errNode fill:#f6b8b8,stroke:#b91c1c,color:#450a0a
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
 ```
 
 [runner-spawner](https://github.com/fordaj/runner-spawner) manages self-hosted CI runners. This repository uses it to manage the runners its GitHub Actions workflow (`.github/workflows/ci.yml`) runs on; runner configuration lives in `.runner-spawner.json` (`fordaj/logamuffin`, runners `runner01`/`runner02`, group `Default`, runner version `2.338.2`, state dir `.runners/`).

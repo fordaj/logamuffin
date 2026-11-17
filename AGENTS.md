@@ -2,12 +2,20 @@
 
 ```mermaid
 flowchart LR
-    Code[Edit source] --> Doc[Update the sibling page<br/>in the same change]
-    Doc --> Regen["scripts/docs.sh"]
-    Regen --> Site[./site — git-ignored]
-    Site --> Review[Self-review the<br/>changed pages]
-    Review --> Commit[Commit source + doc<br/>together]
+    Code("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>Edit source") --> Doc("<img src='barnacle:file-text.svg' width='20' alt=''/><br/>Update the sibling page<br/>in the same change")
+    Doc --> Regen("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>scripts/docs.sh</u>")
+    Regen --> Site("<img src='barnacle:folder.svg' width='20' alt=''/><br/>./site — git-ignored")
+    Site --> Review("<img src='barnacle:check.svg' width='20' alt=''/><br/>Self-review the<br/>changed pages")
+    Review --> Commit("<img src='barnacle:git-branch.svg' width='20' alt=''/><br/>Commit source + doc<br/>together")
     click Regen href "scripts/docs.sh.md"
+    class Doc mdFile
+    class Regen shFile
+    class Site folder
+    class Review checkNode
+    classDef mdFile fill:#dcd6ce,stroke:#6b6255,color:#292524
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
+    classDef checkNode fill:#9fe8c9,stroke:#0f766e,color:#052e22
 ```
 
 Guidance for agents (and humans) working in this repository.

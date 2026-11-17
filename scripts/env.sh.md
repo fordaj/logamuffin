@@ -2,19 +2,25 @@
 
 ```mermaid
 flowchart TD
-    Env[env.sh] --> Locate["locate cascade<br/>BASH_SOURCE / zsh eval"]
-    Locate --> Common[".common.env<br/>versions + slugs"]
-    Common --> Plat{"uname -s / uname -m"}
-    Plat --> LA[.linux-arm64.env]
-    Plat --> LX[.linux-x86_64.env]
-    Plat --> MA[.macos-arm64.env]
-    Plat --> MX[.macos-x86_64.env]
-    Plat --> WA[.windows-arm64.env]
-    Plat --> WX[.windows-x86_64.env]
-    Plat -->|unsupported| Fail["stderr + return 1"]
-    LA --> Anchor[anchor *_BIN to REPO_ROOT_DIR]
+    Env("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>env.sh") --> Locate("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>locate cascade<br/>BASH_SOURCE / zsh eval")
+    Locate --> Common("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.common.env<br/>versions + slugs")
+    Common --> Plat{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>uname -s / uname -m"}}
+    Plat --> LA("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.linux-arm64.env")
+    Plat --> LX("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.linux-x86_64.env")
+    Plat --> MA("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.macos-arm64.env")
+    Plat --> MX("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.macos-x86_64.env")
+    Plat --> WA("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.windows-arm64.env")
+    Plat --> WX("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.windows-x86_64.env")
+    Plat -->|unsupported| Fail("<img src='barnacle:circle-exclamation-point.svg' width='20' alt=''/><br/>stderr + return 1")
+    LA --> Anchor("<img src='barnacle:anchor.svg' width='20' alt=''/><br/>anchor *_BIN to REPO_ROOT_DIR")
     MA --> Anchor
     WA --> Anchor
+    class Env,Locate,Common,LA,LX,MA,MX,WA,WX shFile
+    class Plat hexNode
+    class Fail errNode
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef errNode fill:#f6b8b8,stroke:#b91c1c,color:#450a0a
 ```
 
 `scripts/env.sh` is the plumbing that makes the pinned helper tools resolvable from any script, in any working directory, on every supported platform. It is sourced — never executed — and it works from both bash and zsh.

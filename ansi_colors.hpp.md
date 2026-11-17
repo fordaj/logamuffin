@@ -2,13 +2,15 @@
 
 ```mermaid
 flowchart LR
-    ANSI["ansi_colors.hpp<br/>constexpr escape constants"]
-    ANSI --> Defaults["kBuiltinLevels<br/>logamuffin.hpp"]
-    ANSI --> Registry["default_levels()<br/>upsert_level()"]
-    ANSI --> Names["color name tables<br/>color.cpp"]
+    ANSI("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>ansi_colors.hpp<br/>constexpr escape constants")
+    ANSI --> Defaults("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>kBuiltinLevels<br/>logamuffin.hpp</u>")
+    ANSI --> Registry("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>default_levels()<br/>upsert_level()</u>")
+    ANSI --> Names("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>color name tables<br/>color.cpp</u>")
     click Defaults href "logamuffin.cpp.md"
     click Registry href "log_levels.cpp.md"
     click Names href "color.cpp.md"
+    class ANSI,Defaults,Registry,Names goFile
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
 ```
 
 Header-only table of ANSI escape sequences used throughout the logger. There is no `.cpp` counterpart; the constants are `constexpr std::string_view` at global scope.

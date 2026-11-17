@@ -2,19 +2,23 @@
 
 ```mermaid
 flowchart LR
-    Script[Your shell script] -->|<a href='scripts/log.sh.md'>log INFO</a>| Wrap["scripts/log.sh<br/>call-site LOG_SOURCE"]
-    Script -->|logamuffin INFO 'msg'| Bin[logamuffin binary]
+    Script("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>Your shell script") -->|<a href='scripts/log.sh.md'>log INFO</a>| Wrap("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>scripts/log.sh<br/>call-site LOG_SOURCE")
+    Script -->|logamuffin INFO 'msg'| Bin("<img src='barnacle:binary.svg' width='20' alt=''/><br/><u>logamuffin binary</u>")
     Wrap --> Bin
-    Bin --> Cfg["load_config()<br/>defaults → file → env"]
-    Cfg --> Reg[Level registry]
+    Bin --> Cfg("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>load_config()<br/>defaults → file → env</u>")
+    Cfg --> Reg("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>Level registry</u>")
     Bin --> Reg
-    Reg -->|below 40| Out[stdout]
-    Reg -->|40 or above| Err[stderr]
-    Bin --> File["append_locked()<br/>→ .logs/log.log"]
+    Reg -->|below 40| Out("<img src='barnacle:monitor.svg' width='20' alt=''/><br/>stdout")
+    Reg -->|40 or above| Err("<img src='barnacle:monitor.svg' width='20' alt=''/><br/>stderr")
+    Bin --> File("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>append_locked()<br/>→ .logs/log.log</u>")
     click Bin href "logamuffin.cpp.md"
     click Cfg href "config.cpp.md"
     click Reg href "log_levels.cpp.md"
     click File href "platform.cpp.md"
+    class Script,Wrap shFile
+    class Bin,Cfg,Reg,File goFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
 ```
 
 Logamuffin is a lightweight, cross-platform logging utility built in C++20. It brings readable, colorized logging to shell scripts, build pipelines, and command-line tools — without requiring a logging framework or a scripting-language runtime.

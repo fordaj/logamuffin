@@ -2,17 +2,24 @@
 
 ```mermaid
 flowchart TD
-    RT[run_tests.sh] --> Src["sources.sh<br/>UNIT_SOURCES / SOURCES"]
-    Gen["generate_version.sh<br/>-I.version"] --> Unit
-    Src --> Unit["unit binary<br/>tests/unit/test_logamuffin.cpp"]
-    Src --> Dev["fresh dev binary<br/>SOURCES"]
-    Unit --> UT[doctest suite]
-    Dev --> IT["python3<br/>tests/integration/test_cli.py"]
-    UT --> Sum[pass/fail summary<br/>exit 0 only if both pass]
+    RT("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>run_tests.sh") --> Src("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>sources.sh<br/>UNIT_SOURCES / SOURCES")
+    Gen("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>generate_version.sh<br/>-I.version") --> Unit
+    Src --> Unit("<img src='barnacle:binary.svg' width='20' alt=''/><br/>unit binary<br/>tests/unit/test_logamuffin.cpp")
+    Src --> Dev("<img src='barnacle:binary.svg' width='20' alt=''/><br/><u>fresh dev binary<br/>SOURCES</u>")
+    Unit --> UT("<img src='barnacle:check.svg' width='20' alt=''/><br/><u>doctest suite</u>")
+    Dev --> IT("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>python3<br/>tests/integration/test_cli.py</u>")
+    UT --> Sum("<img src='barnacle:clipboard-check.svg' width='20' alt=''/><br/>pass/fail summary<br/>exit 0 only if both pass")
     IT --> Sum
     click UT href "../docs/TESTING.md"
     click IT href "../docs/TESTING.md"
     click Dev href "../logamuffin.cpp.md"
+    class RT,Src,Gen shFile
+    class Unit,Dev goFile
+    class UT checkNode
+    class IT goFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef checkNode fill:#9fe8c9,stroke:#0f766e,color:#052e22
 ```
 
 `scripts/run_tests.sh` builds and runs the complete logamuffin test suite — C++ unit tests (doctest) and cross-platform CLI integration tests (Python standard library) — and is the one command CI and contributors use. See [docs/TESTING.md](../docs/TESTING.md) for the testing architecture, coverage matrix, and how to add tests.

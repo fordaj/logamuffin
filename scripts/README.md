@@ -2,14 +2,18 @@
 
 ```mermaid
 flowchart TD
-    Scripts[task scripts] --> Entry["entry.sh<br/>sourced, never executed"]
-    Entry --> Env["env.sh<br/>locates cascade,<br/>anchors *_BIN absolute"]
-    Env --> Common[.common.env<br/>pins + repo slugs]
-    Env --> Plat[".os-arch.env<br/>PROJECT_PLATFORM + *_BIN"]
-    Entry --> Logf["log() — wraps bundled<br/>logamuffin, printf fallback"]
+    Scripts("<img src='barnacle:folder.svg' width='20' alt=''/><br/>task scripts") --> Entry("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>entry.sh<br/>sourced, never executed</u>")
+    Entry --> Env("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>env.sh<br/>locates cascade,<br/>anchors *_BIN absolute</u>")
+    Env --> Common("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.common.env<br/>pins + repo slugs")
+    Env --> Plat("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.os-arch.env<br/>PROJECT_PLATFORM + *_BIN")
+    Entry --> Logf("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>log() — wraps bundled<br/>logamuffin, printf fallback</u>")
     click Entry href "entry.sh.md"
     click Env href "env.sh.md"
     click Logf href "log.sh.md"
+    class Scripts folder
+    class Entry,Env,Logf,Common,Plat shFile
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
 ```
 
 The `scripts/` directory carries the repository's build/release/docs tooling: an environment cascade the other scripts source, plus one entry point per task. Everything here is bash; nothing requires a global install beyond what each script documents.
