@@ -2,17 +2,21 @@
 
 ```mermaid
 flowchart LR
-    Def["default_levels()<br/>ALWAYS…CRITICAL"] --> Reg["Config.levels<br/>sorted by value"]
-    Upsert["upsert_level()<br/>env/JSON application"] --> Reg
-    Reg --> Find["find_level_with_alias()<br/>exact + kLevelAliases"]
-    Reg --> ByVal[find_level_by_value]
-    Find --> Parse[parse_level]
+    Def("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>default_levels()<br/>ALWAYS…CRITICAL</u>") --> Reg("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>Config.levels<br/>sorted by value")
+    Upsert("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>upsert_level()<br/>env/JSON application</u>") --> Reg
+    Reg --> Find("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>find_level_with_alias()<br/>exact + kLevelAliases")
+    Reg --> ByVal("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>find_level_by_value")
+    Find --> Parse("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>parse_level")
     ByVal --> Parse
-    Parse --> Route{value ≥ 40?}
-    Route -->|yes| Err[stderr]
-    Route -->|no| Out[stdout]
+    Parse --> Route{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>value ≥ 40?"}}
+    Route -->|yes| Err("<img src='barnacle:monitor.svg' width='20' alt=''/><br/>stderr")
+    Route -->|no| Out("<img src='barnacle:monitor.svg' width='20' alt=''/><br/>stdout")
     click Def href "ansi_colors.hpp.md"
     click Upsert href "config.cpp.md"
+    class Def,Upsert,Reg,Find,ByVal,Parse goFile
+    class Route hexNode
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
 ```
 
 `log_levels.cpp.md` documents `log_levels.cpp` and `log_levels.hpp`. The extensible log-level model: `Config` holds a sorted list of `LogLevel`s plus threshold and scalar settings. This module manages the registry itself; applying config files and environment variables lives in [config.cpp.md](config.cpp.md).

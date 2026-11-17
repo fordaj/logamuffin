@@ -2,16 +2,24 @@
 
 ```mermaid
 flowchart TD
-    Start[load_config] --> Def["1 · default_levels()<br/>built-in table"]
-    Def --> File{"2 · which JSON file?<br/>--config beats LOG_CONFIG<br/>beats ./.logamuffin"}
-    File -->|explicit file missing or malformed| Bad[false + err]
+    Start("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>load_config") --> Def("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>1 · default_levels()<br/>built-in table</u>")
+    Def --> File{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/><u>2 · which JSON file?<br/>--config beats LOG_CONFIG<br/>beats ./.logamuffin</u>"}}
+    File -->|explicit file missing or malformed| Bad("<img src='barnacle:circle-exclamation-point.svg' width='20' alt=''/><br/>false + err")
     File -->|autodiscovery missing| Env
-    File -->|parsed by json_parser| Env["3 · env overrides<br/>LOG_LEVELS · LOG_LEVEL_VALUE_NAME<br/>LOG_LEVEL · LOG_COLOR · LOG_FILE"]
-    Env --> Thr["4 · threshold resolution<br/>category name or number"]
-    Thr --> Good[Config ready]
+    File -->|parsed by json_parser| Env("<img src='barnacle:file-code.svg' width='20' alt=''/><br/><u>3 · env overrides<br/>LOG_LEVELS · LOG_LEVEL_VALUE_NAME<br/>LOG_LEVEL · LOG_COLOR · LOG_FILE</u>")
+    Env --> Thr("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>4 · threshold resolution<br/>category name or number")
+    Thr --> Good("<img src='barnacle:check.svg' width='20' alt=''/><br/>Config ready")
     click Def href "log_levels.cpp.md"
     click File href "json_parser.cpp.md"
     click Env href "color.cpp.md"
+    class Start,Def,Env,Thr goFile
+    class File hexNode
+    class Bad errNode
+    class Good checkNode
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef errNode fill:#f6b8b8,stroke:#b91c1c,color:#450a0a
+    classDef checkNode fill:#9fe8c9,stroke:#0f766e,color:#052e22
 ```
 
 `config.cpp.md` documents `config.cpp` and `config.hpp`. The module orchestrates how a [Config](log_levels.cpp.md) is built for each invocation: start from defaults, overlay the winning JSON file, overlay environment variables, then resolve scalar thresholds. Level/color/JSON primitives live in their own modules — this one only sequences them.

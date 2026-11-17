@@ -2,15 +2,27 @@
 
 ```mermaid
 flowchart TD
-    Demo[demo.sh] --> Find{locate a binary}
-    Find -->|command -v| OnPath[logamuffin on PATH]
-    Find -->|build/debug| Debug["build/debug/logamuffin"]
-    Find -->|platform output| Rel["build/mode/platform/logamuffin"]
-    Find -->|none found| Err[error + how to build]
-    Demo --> Iso["mktemp -d sandbox<br/>LOG_* scrubbed"]
-    Iso --> Run["every capability,<br/>in README order"]
+    Demo("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>demo.sh") --> Find{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>locate a binary"}}
+    Find -->|command -v| OnPath("<img src='barnacle:check.svg' width='20' alt=''/><br/>logamuffin on PATH")
+    Find -->|build/debug| Debug("<img src='barnacle:binary.svg' width='20' alt=''/><br/><u>build/debug/logamuffin</u>")
+    Find -->|platform output| Rel("<img src='barnacle:binary.svg' width='20' alt=''/><br/><u>build/mode/platform/logamuffin</u>")
+    Find -->|none found| Err("<img src='barnacle:circle-exclamation-point.svg' width='20' alt=''/><br/>error + how to build")
+    Demo --> Iso("<img src='barnacle:folder.svg' width='20' alt=''/><br/>mktemp -d sandbox<br/>LOG_* scrubbed")
+    Iso --> Run("<img src='barnacle:play.svg' width='20' alt=''/><br/>every capability,<br/>in README order")
     click Rel href "build.sh.md"
     click Debug href "run_tests.sh.md"
+    class Demo shFile
+    class Find hexNode
+    class OnPath checkNode
+    class Debug,Rel goFile
+    class Err errNode
+    class Iso folder
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef checkNode fill:#9fe8c9,stroke:#0f766e,color:#052e22
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef errNode fill:#f6b8b8,stroke:#b91c1c,color:#450a0a
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
 ```
 
 `scripts/demo.sh` is a self-contained showcase of every user-facing capability documented in [README.md](../README.md): version/help, severity levels and colors, aliases and numeric levels, threshold filtering, stdout vs stderr routing, the environment surface, custom categories, JSON config and precedence, persistent file logging, concurrent writes, shell patterns, and the Bash `log` helper. Section order follows the README.

@@ -2,9 +2,11 @@
 
 ```mermaid
 flowchart LR
-    T[test.sh] -->|deprecation notice| Exec["exec run_tests.sh --skip-unit"]
-    Exec --> Int["integration suite only<br/>call run_tests.sh for new work"]
+    T("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>test.sh") -->|deprecation notice| Exec("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>exec run_tests.sh --skip-unit</u>")
+    Exec --> Int("<img src='barnacle:file-text.svg' width='20' alt=''/><br/>integration suite only<br/>call run_tests.sh for new work")
     click Exec href "run_tests.sh.md"
+    class T,Exec shFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
 ```
 
 `scripts/test.sh` is a deprecated shim kept for compatibility. The canonical suite is [scripts/run_tests.sh.md](run_tests.sh.md) (`./scripts/run_tests.sh`, unit + integration); the Python CLI integration suite supersedes this legacy Bash suite with isolated tmp dirs, per-test reporting, and broader coverage.

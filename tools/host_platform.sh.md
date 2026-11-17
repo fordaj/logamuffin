@@ -2,12 +2,14 @@
 
 ```mermaid
 flowchart LR
-    HP[host_platform.sh<br/>sourced, functions only] --> Gen["generate_version.sh"]
-    HP --> Rel["release.sh"]
-    HP --> Demo["demo.sh"]
-    HP --> Platform["host_platform()<br/>macos-arm64 etc."]
-    HP --> Locate["locate_versioner()<br/>bundled Versioner binary"]
-    HP --> Parse["parse_shell_export()<br/>read VERSION_OUT"]
+    HP("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>host_platform.sh<br/>sourced, functions only") --> Gen("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>generate_version.sh")
+    HP --> Rel("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>release.sh")
+    HP --> Demo("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>demo.sh")
+    HP --> Platform("<img src='barnacle:monitor.svg' width='20' alt=''/><br/>host_platform()<br/>macos-arm64 etc.")
+    HP --> Locate("<img src='barnacle:search.svg' width='20' alt=''/><br/>locate_versioner()<br/>bundled Versioner binary")
+    HP --> Parse("<img src='barnacle:file-input.svg' width='20' alt=''/><br/>parse_shell_export()<br/>read VERSION_OUT")
+    class HP,Gen,Rel,Demo shFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
 ```
 
 `tools/host_platform.sh` is sourced — never executed — by the Bash tooling that needs to know which bundle platform the host is or where the bundled Versioner binary lives. It emits no output and sets no shell options at source time; it only defines functions. Keeping them here means one mapping to update when a platform is added.

@@ -2,20 +2,24 @@
 
 ```mermaid
 flowchart LR
-    In[user-supplied text] --> Lower[lowercase]
-    In --> Trim[trim]
-    In --> Norm["normalize_key()<br/>strip separators, lowercase"]
-    In --> Int["parse_int_strict()<br/>capped at kLevelValueLimit"]
-    In --> Bool["parse_bool_string()<br/>kTruthyTokens / kFalsyTokens"]
-    In --> Hex["hex_digit_value()<br/>0–15 or -1"]
-    Norm --> Cfg[config keys]
+    In("<img src='barnacle:file-input.svg' width='20' alt=''/><br/>user-supplied text") --> Lower("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>lowercase")
+    In --> Trim("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>trim")
+    In --> Norm("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>normalize_key()<br/>strip separators, lowercase")
+    In --> Int("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>parse_int_strict()<br/>capped at kLevelValueLimit")
+    In --> Bool("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>parse_bool_string()<br/>kTruthyTokens / kFalsyTokens")
+    In --> Hex("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>hex_digit_value()<br/>0–15 or -1")
+    Norm --> Cfg("<img src='barnacle:braces.svg' width='20' alt=''/><br/><u>config keys</u>")
     Int --> Cfg
     Bool --> Cfg
-    Hex --> Json["\uXXXX escapes"]
-    Hex --> Color["#rrggbb truecolor"]
+    Hex --> Json("<img src='barnacle:braces.svg' width='20' alt=''/><br/><u>\uXXXX escapes</u>")
+    Hex --> Color("<img src='barnacle:palette.svg' width='20' alt=''/><br/><u>#rrggbb truecolor</u>")
     click Cfg href "config.cpp.md"
     click Json href "json_parser.cpp.md"
     click Color href "color.cpp.md"
+    class Lower,Trim,Norm,Int,Bool,Hex goFile
+    class Cfg,Json jsonFile
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef jsonFile fill:#cdb9f7,stroke:#6d28d9,color:#2e1065
 ```
 
 `text_utils.cpp.md` documents `text_utils.cpp` and `text_utils.hpp`. Small, pure string/number helpers shared by the config, color, and JSON modules so each can depend on them explicitly instead of sharing an anonymous namespace. No I/O, no platform dependencies.

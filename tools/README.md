@@ -2,14 +2,14 @@
 
 ```mermaid
 flowchart TD
-    Tools[tools/] --> Bundles["pinned bundles<br/>update.sh + versioned dirs"]
-    Tools --> Helpers["committed helpers<br/>update-bundle.sh · host_platform.sh<br/>generate_version.sh · sources.sh"]
-    Tools --> Doctest[vendored doctest]
-    Bundles --> Ver[versioner]
-    Bundles --> Logm[logamuffin]
-    Bundles --> RS[runner-spawner]
-    Bundles --> Bar[barnacle]
-    Bundles --> FL[formattington-lite]
+    Tools("<img src='barnacle:folder.svg' width='20' alt=''/><br/>tools/") --> Bundles("<img src='barnacle:package.svg' width='20' alt=''/><br/>pinned bundles<br/>update.sh + versioned dirs")
+    Tools --> Helpers("<img src='barnacle:wrench.svg' width='20' alt=''/><br/><u>committed helpers<br/>update-bundle.sh · host_platform.sh<br/>generate_version.sh · sources.sh</u>")
+    Tools --> Doctest("<img src='barnacle:package.svg' width='20' alt=''/><br/><u>vendored doctest</u>")
+    Bundles --> Ver("<img src='barnacle:tag.svg' width='20' alt=''/><br/><u>versioner</u>")
+    Bundles --> Logm("<img src='barnacle:binary.svg' width='20' alt=''/><br/><u>logamuffin</u>")
+    Bundles --> RS("<img src='barnacle:server.svg' width='20' alt=''/><br/><u>runner-spawner</u>")
+    Bundles --> Bar("<img src='barnacle:book-open.svg' width='20' alt=''/><br/><u>barnacle</u>")
+    Bundles --> FL("<img src='barnacle:sparkles.svg' width='20' alt=''/><br/><u>formattington-lite</u>")
     click Ver href "versioner/update.sh.md"
     click Logm href "logamuffin/update.sh.md"
     click RS href "runner-spawner/update.sh.md"
@@ -17,6 +17,12 @@ flowchart TD
     click FL href "formattington-lite/update.sh.md"
     click Helpers href "update-bundle.sh.md"
     click Doctest href "doctest/README.md"
+    class Tools folder
+    class Bundles,Doctest boxNode
+    class Ver tagNode
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
+    classDef boxNode fill:#e8cf9d,stroke:#a16207,color:#33240a
+    classDef tagNode fill:#f6b8d4,stroke:#be185d,color:#500724
 ```
 
 `tools/` carries the repository's pinned helper binaries — build, release, logging, versioning, and docs tooling — plus one `update.sh` per bundle that refreshes it. These are **not** the tools this repository builds (that's `logamuffin` itself, at the repo root); they are the tools used to build, test, log, and document this repository.
@@ -45,7 +51,7 @@ tools/<name>/
 | [barnacle](barnacle/update.sh.md) | Renders this documentation site | [update.sh](barnacle/update.sh.md) |
 | [formattington-lite](formattington-lite/update.sh.md) | Slim formattington bundle (all platforms committed) | [update.sh](formattington-lite/update.sh.md) |
 
-Pins currently named by `scripts/.common.env`: `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v254.1.3.0.47`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v254.0.1.1.22` (formattington-lite is pinned by its own version directory, `tools/formattington-lite/v0.0.2.0.53/`, and is not wired into the environment cascade). All four cascaded bundles are committed to git, including the logamuffin binaries.
+Pins currently named by `scripts/.common.env`: `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v254.1.3.0.47`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v0.0.2.1.25` (formattington-lite is pinned by its own version directory, `tools/formattington-lite/v0.0.2.0.53/`, and is not wired into the environment cascade). All four cascaded bundles are committed to git, including the logamuffin binaries.
 
 `<platform>` archives are native (`.tar.gz` on macOS/Linux, `.zip` on Windows); there is no 7zip dependency unless a legacy release ships `.7z` assets (still accepted as a fallback).
 

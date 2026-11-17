@@ -2,15 +2,23 @@
 
 ```mermaid
 flowchart TD
-    Rel[release.sh] --> Ver["versioner<br/>VERSION + TAG"]
-    Ver --> Gen["tools/generate_version.sh<br/>.version/version.hpp"]
-    Gen --> Build["BUILD_MODE=release<br/>scripts/build.sh"]
-    Build --> Stage["dist/platform/<br/>binary + README + LICENSE"]
-    Stage --> Tar["archives +<br/>checksums.txt"]
-    Tar --> Tag[annotated tag + push]
-    Tag --> GH["gh release create"]
+    Rel("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>release.sh") --> Ver("<img src='barnacle:tag.svg' width='20' alt=''/><br/><u>versioner<br/>VERSION + TAG</u>")
+    Ver --> Gen("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>tools/generate_version.sh<br/>.version/version.hpp")
+    Gen --> Build("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>BUILD_MODE=release<br/>scripts/build.sh</u>")
+    Build --> Stage("<img src='barnacle:folder.svg' width='20' alt=''/><br/>dist/platform/<br/>binary + README + LICENSE")
+    Stage --> Tar("<img src='barnacle:package.svg' width='20' alt=''/><br/>archives +<br/>checksums.txt")
+    Tar --> Tag("<img src='barnacle:tag.svg' width='20' alt=''/><br/>annotated tag + push")
+    Tag --> GH("<img src='barnacle:rocket.svg' width='20' alt=''/><br/>gh release create")
     click Ver href "version.sh.md"
     click Build href "build.sh.md"
+    class Rel,Gen,Build shFile
+    class Ver,Tag tagNode
+    class Stage folder
+    class Tar boxNode
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef tagNode fill:#f6b8d4,stroke:#be185d,color:#500724
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
+    classDef boxNode fill:#e8cf9d,stroke:#a16207,color:#33240a
 ```
 
 `scripts/release.sh` computes the next version with the bundled Versioner binary, regenerates `.version/version.hpp`, cross-compiles the release binaries via [build.sh.md](build.sh.md), packs each platform into a flat archive (binary + `README.md` + `LICENSE`), tags `HEAD`, and publishes a GitHub release. Adapted from fordaj/Versioner's release script — same concept, Zig instead of Go.

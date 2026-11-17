@@ -2,17 +2,27 @@
 
 ```mermaid
 flowchart LR
-    Up[update.sh<br/>thin wrapper] --> Core["../update-bundle.sh<br/>shared implementation"]
-    Core --> Tag{resolve tag<br/>latest release or --tag}
-    Tag --> DL["gh release download"]
-    DL --> Sum{checksums.txt<br/>shipped?}
-    Sum -->|yes| Verify["verify SHA256"]
-    Sum -->|no| Warn["warn, keep going"]
-    Verify --> Stage["stage into v…/platform/<br/>binary only"]
+    Up("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>update.sh<br/>thin wrapper") --> Core("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>../update-bundle.sh<br/>shared implementation</u>")
+    Core --> Tag{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>resolve tag<br/>latest release or --tag"}}
+    Tag --> DL("<img src='barnacle:download.svg' width='20' alt=''/><br/>gh release download")
+    DL --> Sum{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>checksums.txt<br/>shipped?"}}
+    Sum -->|yes| Verify("<img src='barnacle:check.svg' width='20' alt=''/><br/>verify SHA256")
+    Sum -->|no| Warn("<img src='barnacle:triangle-exclamation-point.svg' width='20' alt=''/><br/>warn, keep going")
+    Verify --> Stage("<img src='barnacle:folder.svg' width='20' alt=''/><br/>stage into v…/platform/<br/>binary only")
     Warn --> Stage
-    Stage --> Swap["swap in,<br/>remove superseded"]
-    Swap --> Smoke["host binary reports<br/>its version"]
+    Stage --> Swap("<img src='barnacle:refresh-cw.svg' width='20' alt=''/><br/>swap in,<br/>remove superseded")
+    Swap --> Smoke("<img src='barnacle:check.svg' width='20' alt=''/><br/>host binary reports<br/>its version")
     click Core href "../update-bundle.sh.md"
+    class Up,Core shFile
+    class Tag,Sum hexNode
+    class DL dlNode
+    class Verify,Smoke checkNode
+    class Stage folder
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef dlNode fill:#93e2e2,stroke:#0f766e,color:#042f2e
+    classDef checkNode fill:#9fe8c9,stroke:#0f766e,color:#052e22
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
 ```
 
 [Logamuffin](https://github.com/fordaj/logamuffin) is the structured logging backend: a small C++20 binary used by this repository's tooling via `scripts/entry.sh`'s `log()` (and by the fordaj ecosystem more broadly — this repository is logamuffin's source). This bundle is the prebuilt upstream binary, distinct from the `logamuffin` built from this tree.

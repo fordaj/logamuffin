@@ -2,15 +2,23 @@
 
 ```mermaid
 flowchart LR
-    Mode{BUILD_MODE} --> Rel["release · -O2 -DNDEBUG"]
-    Mode --> Dbg["debug · -O0 -g3 -DDEBUG"]
-    Mode --> Bad[anything else · exit 2]
-    Src["tools/sources.sh<br/>SOURCES — 8 units"] --> Compile
-    Gen["tools/generate_version.sh<br/>regenerates .version/"] --> Compile
-    Rel --> Compile["compile per target<br/>native clang++ · Zig musl"]
+    Mode{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>BUILD_MODE"}} --> Rel("<img src='barnacle:settings.svg' width='20' alt=''/><br/>release · -O2 -DNDEBUG")
+    Mode --> Dbg("<img src='barnacle:settings.svg' width='20' alt=''/><br/>debug · -O0 -g3 -DDEBUG")
+    Mode --> Bad("<img src='barnacle:circle-exclamation-point.svg' width='20' alt=''/><br/>anything else · exit 2")
+    Src("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>tools/sources.sh<br/>SOURCES — 8 units") --> Compile
+    Gen("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>tools/generate_version.sh<br/>regenerates .version/</u>") --> Compile
+    Rel --> Compile("<img src='barnacle:hammer.svg' width='20' alt=''/><br/>compile per target<br/>native clang++ · Zig musl")
     Dbg --> Compile
-    Compile --> Out["build/mode/platform/<br/>logamuffin[.exe]"]
+    Compile --> Out("<img src='barnacle:binary.svg' width='20' alt=''/><br/>build/mode/platform/<br/>logamuffin[.exe]")
     click Gen href "../README.md"
+    class Mode hexNode
+    class Src,Gen shFile
+    class Bad errNode
+    class Out goFile
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef errNode fill:#f6b8b8,stroke:#b91c1c,color:#450a0a
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
 ```
 
 `scripts/build.sh` builds the six release targets: macOS x86-64 and arm64 (native `clang++`), and Windows x86-64/arm64 + Linux x86-64/arm64 (musl) via Zig (`zig c++ -target …`). Mode comes from `BUILD_MODE` — `release` (default, `-O2 -DNDEBUG`) or `debug` (`-O0 -g3 -DDEBUG`); anything else exits 2. Native compiler can be overridden with `NATIVE_CXX`, Zig with `ZIG_CXX`, and clean rebuilds with `CLEAN_BUILD=false`.

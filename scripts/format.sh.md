@@ -2,12 +2,20 @@
 
 ```mermaid
 flowchart LR
-    Fmt[format.sh] --> UV["uv run formattington all"]
-    UV --> Md["prettier<br/>markdown"]
-    UV --> Cpp["clang-format<br/>c · h · cpp · hpp"]
-    UV --> Sh["shfmt -i 4<br/>shell"]
-    UV --> Scope[".formattington.json +<br/>.clang-format / .prettierrc"]
-    Ci["ci/format_check.sh — check-only"] --> UV
+    Fmt("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>format.sh") --> UV("<img src='barnacle:square-terminal.svg' width='20' alt=''/><br/>uv run formattington all")
+    UV --> Md("<img src='barnacle:file-text.svg' width='20' alt=''/><br/>prettier<br/>markdown")
+    UV --> Cpp("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>clang-format<br/>c · h · cpp · hpp")
+    UV --> Sh("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>shfmt -i 4<br/>shell")
+    UV --> Scope("<img src='barnacle:braces.svg' width='20' alt=''/><br/>.formattington.json +<br/>.clang-format / .prettierrc")
+    Ci("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>ci/format_check.sh — check-only") --> UV
+    class Fmt,Sh,Ci shFile
+    class Md mdFile
+    class Cpp goFile
+    class Scope jsonFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef mdFile fill:#dcd6ce,stroke:#6b6255,color:#292524
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef jsonFile fill:#cdb9f7,stroke:#6d28d9,color:#2e1065
 ```
 
 `scripts/format.sh` formats the whole repository with [formattington](https://github.com/fordaj/formattington): Markdown via prettier, C/C++ via clang-format, shell via `shfmt -i 4`, as scoped by `.formattington.json` and styled by `.clang-format`/`.prettierrc`. The vendored header under `tools/doctest/` is skipped (as are `build/` and other generated locations).

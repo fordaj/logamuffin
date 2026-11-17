@@ -2,12 +2,22 @@
 
 ```mermaid
 flowchart LR
-    GV[generate_version.sh] --> Ver["versioner --format shell<br/>against the repo"]
-    Ver --> Check{"validate<br/>5 components + tag matches"}
-    Check -->|fail| Err[exit 1]
-    Check -->|ok| Out[".version/version.hpp<br/>LOGAMUFFIN_VERSION"]
-    Out --> Consumers["build.sh · release.sh<br/>run_tests.sh"]
+    GV("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>generate_version.sh") --> Ver("<img src='barnacle:tag.svg' width='20' alt=''/><br/>versioner --format shell<br/>against the repo")
+    Ver --> Check{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>validate<br/>5 components + tag matches"}}
+    Check -->|fail| Err("<img src='barnacle:circle-exclamation-point.svg' width='20' alt=''/><br/>exit 1")
+    Check -->|ok| Out("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>.version/version.hpp<br/>LOGAMUFFIN_VERSION")
+    Out --> Consumers("<img src='barnacle:wrench.svg' width='20' alt=''/><br/><u>build.sh · release.sh<br/>run_tests.sh</u>")
     click Consumers href "../scripts/build.sh.md"
+    class GV shFile
+    class Ver tagNode
+    class Check hexNode
+    class Err errNode
+    class Out goFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef tagNode fill:#f6b8d4,stroke:#be185d,color:#500724
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef errNode fill:#f6b8b8,stroke:#b91c1c,color:#450a0a
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
 ```
 
 `tools/generate_version.sh` regenerates `.version/version.hpp` from git history via the bundled [Versioner](versioner/update.sh.md) binary. Build scripts call it before compiling so `logamuffin --version` always reflects the current `HEAD`. The `.version/` directory is git-ignored and must not be committed. Host platform detection and bundled-binary resolution are shared with the release tooling via [host_platform.sh.md](host_platform.sh.md) (`host_platform` / `locate_versioner` / `parse_shell_export`).

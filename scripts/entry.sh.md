@@ -2,13 +2,19 @@
 
 ```mermaid
 flowchart TD
-    Script[any repo script] --> Entry["entry.sh — sourced"]
-    Entry --> Env["env.sh — cascade"]
-    Entry --> Log["log LEVEL MESSAGE"]
-    Log --> Bin{logamuffin binary<br/>available?}
-    Bin -->|yes| Real["forward to bundled binary<br/>LOG_SOURCE = file:func:line"]
-    Bin -->|no| Fallback["printf fallback<br/>same interface"]
+    Script("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>any repo script") --> Entry("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>entry.sh — sourced")
+    Entry --> Env("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>env.sh — cascade</u>")
+    Entry --> Log("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>log LEVEL MESSAGE")
+    Log --> Bin{{"<img src='barnacle:hexagon.svg' width='20' alt=''/><br/>logamuffin binary<br/>available?"}}
+    Bin -->|yes| Real("<img src='barnacle:binary.svg' width='20' alt=''/><br/>forward to bundled binary<br/>LOG_SOURCE = file:func:line")
+    Bin -->|no| Fallback("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>printf fallback<br/>same interface")
     click Env href "env.sh.md"
+    class Script,Entry,Log,Fallback shFile
+    class Bin hexNode
+    class Real goFile
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
+    classDef hexNode fill:#ffe08a,stroke:#a16207,color:#422006
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
 ```
 
 `scripts/entry.sh` is sourced — never executed — by the repo's tooling scripts. It sources [env.sh.md](env.sh.md) (locating the pinned tool binaries) and defines `log()`, the repo-internal logging helper used by those scripts' headers.

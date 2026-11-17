@@ -2,14 +2,18 @@
 
 ```mermaid
 flowchart TD
-    Scripts[task scripts] --> Entry["entry.sh<br/>sourced, never executed"]
-    Entry --> Env["env.sh<br/>locates cascade,<br/>anchors *_BIN absolute"]
-    Env --> Common[.common.env<br/>pins + repo slugs]
-    Env --> Plat[".os-arch.env<br/>PROJECT_PLATFORM + *_BIN"]
-    Entry --> Logf["log() — wraps bundled<br/>logamuffin, printf fallback"]
+    Scripts("<img src='barnacle:folder.svg' width='20' alt=''/><br/>task scripts") --> Entry("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>entry.sh<br/>sourced, never executed</u>")
+    Entry --> Env("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>env.sh<br/>locates cascade,<br/>anchors *_BIN absolute</u>")
+    Env --> Common("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.common.env<br/>pins + repo slugs")
+    Env --> Plat("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>.os-arch.env<br/>PROJECT_PLATFORM + *_BIN")
+    Entry --> Logf("<img src='barnacle:terminal.svg' width='20' alt=''/><br/><u>log() — wraps bundled<br/>logamuffin, printf fallback</u>")
     click Entry href "entry.sh.md"
     click Env href "env.sh.md"
     click Logf href "log.sh.md"
+    class Scripts folder
+    class Entry,Env,Logf,Common,Plat shFile
+    classDef folder fill:#f0c558,stroke:#8a6d1c,color:#332a05
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
 ```
 
 The `scripts/` directory carries the repository's build/release/docs tooling: an environment cascade the other scripts source, plus one entry point per task. Everything here is bash; nothing requires a global install beyond what each script documents.
@@ -20,7 +24,7 @@ Vernacular used in the headers (`log INFO`, `$REPO_ROOT_DIR`, `VERSIONER_BIN`): 
 
 - `scripts/entry.sh` — sources `scripts/env.sh` and defines `log()` (logamuffin, with a printf fallback). Sourced by everything else. See [entry.sh.md](entry.sh.md).
 - `scripts/env.sh` — locates and sources the cascade below, then anchors the repository-relative `*_BIN` tool paths to absolute paths. See [env.sh.md](env.sh.md).
-- `scripts/.common.env`, `scripts/.<os>-<arch>.env` — the cascade proper. Hidden files, so barnacle does not render them as pages; their contract (pinned versions, platform quirks) is documented inside [env.sh.md](env.sh.md) instead. `.common.env` pins `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v254.1.3.0.47`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v254.0.1.1.22` and holds the upstream `fordaj/*` slugs; each platform file sets `PROJECT_PLATFORM` and the `*_BIN` paths for its `<os>-<arch>`.
+- `scripts/.common.env`, `scripts/.<os>-<arch>.env` — the cascade proper. Hidden files, so barnacle does not render them as pages; their contract (pinned versions, platform quirks) is documented inside [env.sh.md](env.sh.md) instead. `.common.env` pins `VERSIONER v0.0.3.0.5`, `LOGAMUFFIN v254.1.3.0.47`, `RUNNER_SPAWNER v0.0.1.2.6`, `BARNACLE v0.0.2.1.25` and holds the upstream `fordaj/*` slugs; each platform file sets `PROJECT_PLATFORM` and the `*_BIN` paths for its `<os>-<arch>`.
 
 ## Task scripts
 

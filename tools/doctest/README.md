@@ -2,10 +2,15 @@
 
 ```mermaid
 flowchart LR
-    DH["doctest.h<br/>v2.5.3 · single header · vendored"] --> Bin[unit binary<br/>-Itools/doctest/v2.5.3]
-    Bin --> RT["run_tests.sh"]
-    RT --> CI["ci: ./scripts/run_tests.sh<br/>on macOS"]
+    DH("<img src='barnacle:file-code.svg' width='20' alt=''/><br/>doctest.h<br/>v2.5.3 · single header · vendored") --> Bin("<img src='barnacle:binary.svg' width='20' alt=''/><br/><u>unit binary<br/>-Itools/doctest/v2.5.3</u>")
+    Bin --> RT("<img src='barnacle:terminal.svg' width='20' alt=''/><br/>run_tests.sh")
+    RT --> CI("<img src='barnacle:check.svg' width='20' alt=''/><br/>ci: ./scripts/run_tests.sh<br/>on macOS")
     click Bin href "../../scripts/run_tests.sh.md"
+    class DH goFile
+    class Bin goFile
+    class RT shFile
+    classDef goFile fill:#8fd8ef,stroke:#0277a8,color:#08303d
+    classDef shFile fill:#abe07a,stroke:#3f6212,color:#16280a
 ```
 
 `tools/doctest/` holds the vendored third-party [doctest](https://github.com/doctest/doctest) testing framework — the C++ unit tests in `tests/unit/test_logamuffin.cpp` are built against it. It is the only third-party code vendored in this repository, and it ships as a single header, so there is no build step and no package manager involvement.
